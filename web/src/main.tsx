@@ -1,15 +1,13 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { debugData } from './utils/debugData';
-import { MantineProvider } from '@mantine/core';
-import { customTheme } from './theme';
 import { isEnvBrowser } from './utils/misc';
-import { StoreState } from './store';
 import { HashRouter } from 'react-router-dom';
-import { ModalsProvider } from '@mantine/modals';
+import { ThemeProvider } from 'next-themes';
 import { DoorColumn } from './store/doors';
+import { StoreState } from './store';
 
 debugData<DoorColumn[]>([
   {
@@ -46,40 +44,6 @@ debugData<DoorColumn[]>([
 debugData(
   [
     {
-      action: 'updateDoorData',
-      data: {
-        [0]: {
-          name: 'New door',
-          passcode: 'Supersecret123',
-          autolock: 300,
-          id: 2,
-          zone: 'Mission Row',
-          characters: ['charid1', 'charid2'],
-          groups: {
-            ['police']: 0,
-            ['ambulance']: 1,
-          },
-          items: [{ name: 'mrpd_key', metadata: 'lspd_key', remove: true }],
-          lockSound: null,
-          unlockSound: null,
-          maxDistance: 15.2,
-          state: true,
-          doors: true,
-          auto: true,
-          lockpick: true,
-          hideUi: true,
-          doorRate: null,
-          holdOpen: true,
-        },
-      },
-    },
-  ],
-  3000
-);
-
-debugData(
-  [
-    {
       action: 'setVisible',
       data: undefined,
     },
@@ -96,23 +60,21 @@ debugData<string[]>([
 
 if (isEnvBrowser()) {
   const root = document.getElementById('root');
-
-  // https://i.imgur.com/iPTAdYV.png - Night time img
   root!.style.backgroundImage = 'url("https://i.imgur.com/3pzRj9n.png")';
   root!.style.backgroundSize = 'cover';
   root!.style.backgroundRepeat = 'no-repeat';
   root!.style.backgroundPosition = 'center';
 }
 
-ReactDOM.render(
+const container = document.getElementById('root')!;
+const root = createRoot(container);
+
+root.render(
   <React.StrictMode>
-    <MantineProvider withNormalizeCSS withGlobalStyles theme={customTheme}>
-      <ModalsProvider modalProps={{ transition: 'slide-up' }}>
-        <HashRouter>
-          <App />
-        </HashRouter>
-      </ModalsProvider>
-    </MantineProvider>
-  </React.StrictMode>,
-  document.getElementById('root')
+    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" enableColorScheme={false}>
+      <HashRouter>
+        <App />
+      </HashRouter>
+    </ThemeProvider>
+  </React.StrictMode>
 );

@@ -1,5 +1,4 @@
-import { Box, Button, Stack, Tooltip } from '@mantine/core';
-import { TbPlus } from 'react-icons/tb';
+import { Plus } from 'lucide-react';
 
 interface Props {
   children: React.ReactNode;
@@ -8,16 +7,18 @@ interface Props {
 
 const Layout: React.FC<Props> = ({ children, setter }) => {
   return (
-    <Stack justify="space-between" align="center" sx={{ height: '100%' }}>
-      <Box sx={{ width: '100%', overflowY: 'auto', height: 410 }}>
+    <div className="flex flex-col gap-3 h-full">
+      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {children}
-        <Tooltip label="Criar uma nova linha" withArrow arrowSize={10}>
-          <Button mt={16} fullWidth variant="light" onClick={setter}>
-            <TbPlus size={24} />
-          </Button>
-        </Tooltip>
-      </Box>
-    </Stack>
+      </div>
+      <button
+        title="Adicionar linha"
+        onClick={setter}
+        className="w-full flex items-center justify-center h-9 rounded-md border border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary transition-all"
+      >
+        <Plus size={18} />
+      </button>
+    </div>
   );
 };
 

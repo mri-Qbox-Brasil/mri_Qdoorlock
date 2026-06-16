@@ -1,85 +1,106 @@
-import { ActionIcon, Menu, Text, Tooltip } from '@mantine/core';
-import { TbDots, TbSettings, TbTrash } from 'react-icons/tb';
-import { HiOutlineClipboardCopy } from 'react-icons/all';
-import { GiTeleport } from 'react-icons/gi';
+import { Settings, Copy, MapPin, Trash2, Check, X } from 'lucide-react';
 import { DoorColumn } from '../../../store/doors';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../../store';
 import { convertData } from '../../../utils/convertData';
 import { useClipboard } from '../../../store/clipboard';
 import { fetchNui } from '../../../utils/fetchNui';
-import { openConfirmModal } from '@mantine/modals';
 import { CellContext } from '@tanstack/react-table';
 import { useVisibility } from '../../../store/visibility';
+import { useState } from 'react';
 
 const ActionsMenu: React.FC<{ data: CellContext<DoorColumn, unknown> }> = ({ data }) => {
   const navigate = useNavigate();
   const setClipboard = useClipboard((state) => state.setClipboard);
   const setVisible = useVisibility((state) => state.setVisible);
-  return (
-    <Menu position="right-start" width={200}>
-      <Menu.Target>
-        <Tooltip label="Ações da Porta">
-          <ActionIcon color="blue.4" variant="transparent">
-            <TbDots size={24} />
-          </ActionIcon>
-        </Tooltip>
-      </Menu.Target>
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
-      <Menu.Dropdown>
-        <Menu.Item
-          icon={<TbSettings size={18} />}
+  const doorId = data.row.getValue('id');
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <button
+          title="Configurações"
           onClick={() => {
             useStore.setState(convertData(data.row.original), true);
             navigate('/settings/general');
           }}
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
         >
-          Configurações
-        </Menu.Item>
-        <Menu.Item
-          icon={<HiOutlineClipboardCopy size={18} />}
+          <Settings size={16} />
+        </button>
+
+        <button
+          title="Copiar configurações"
           onClick={() => {
             setClipboard(convertData(data.row.original));
             fetchNui('notify', 'Configurações copiadas');
           }}
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
-          Copiar configurações
-        </Menu.Item>
-        <Menu.Item
-          icon={<GiTeleport size={18} />}
+          <Copy size={16} />
+        </button>
+
+        <button
+          title="Teleportar aqui"
           onClick={() => {
             setVisible(false);
-            fetchNui('teleportToDoor', data.row.getValue('id'));
+            fetchNui('teleportToDoor', doorId);
           }}
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
         >
-          Teleportar aqui
-        </Menu.Item>
-        <Menu.Item
-          color="red"
-          icon={<TbTrash size={18} />}
-          onClick={() =>
-            openConfirmModal({
-              title: 'Confirmar exclusão',
-              centered: true,
-              withCloseButton: false,
-              children: (
-                <Text>
-                  Você tem certeza que deseja excluir esta porta:
-                  <Text component="span" weight={700}>{` ${data.row.getValue('name')}`}</Text>?
-                </Text>
-              ),
-              labels: { confirm: 'Confirmar', cancel: 'Cancelar' },
-              confirmProps: { color: 'red' },
-              onConfirm: () => {
-                fetchNui('deleteDoor', data.row.getValue('id'));
-              },
-            })
-          }
+          <MapPin size={16} />
+        </button>
+
+        <button
+          title="Deletar porta"
+          onClick={() => setConfirmDelete(true)}
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
         >
-          Deletar porta
-        </Menu.Item>
-      </Menu.Dropdown>
-    </Menu>
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {confirmDelete && (
+        <>
+          <div 
+            className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" 
+            onClick={() => setConfirmDelete(false)} 
+          />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-80 bg-card border border-border/60 rounded-2xl shadow-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
+                <Trash2 size={20} />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">Excluir Porta</h3>
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-6">
+              Tem certeza que deseja excluir esta porta? Esta ação não poderá ser desfeita.
+            </p>
+            
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
+                onClick={() => {
+                  fetchNui('deleteDoor', doorId);
+                  setConfirmDelete(false);
+                }}
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 };
 

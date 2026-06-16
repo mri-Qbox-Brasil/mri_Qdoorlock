@@ -1,6 +1,4 @@
-import { Button, NumberInput, Select, Stack } from '@mantine/core';
-import { useEffect, useMemo, useState } from 'react';
-import { useForm } from '@mantine/form';
+import { useState } from 'react';
 import { useSetters, useStore } from '../../../../../store';
 
 interface Props {
@@ -9,92 +7,81 @@ interface Props {
   modal: { opened: boolean; index: number };
 }
 
-interface FormProps {
-  select: string | null;
-  areaSize: number | null;
-  speedMultiplier: number | null;
-}
-
 const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
-  const [select, setSelect] = useState<string | null>(null);
   const lockpickDifficulty = useStore((store) => store.lockpickDifficulty);
   const setLockpickDifficulty = useSetters((setter) => setter.setLockpickDifficulty);
+  const lockpickData = lockpickDifficulty[modal.index];
 
-  const lockpickData = useMemo(() => {
-    return lockpickDifficulty[modal.index];
-  }, [modal, lockpickDifficulty]);
+  const [select, setSelect] = useState<string>(typeof lockpickData === 'string' ? lockpickData : 'custom');
+  const [areaSize, setAreaSize] = useState<number>(typeof lockpickData === 'object' ? lockpickData?.areaSize ?? 0 : 0);
+  const [speedMultiplier, setSpeedMultiplier] = useState<number>(typeof lockpickData === 'object' ? lockpickData?.speedMultiplier ?? 1 : 1);
+  const [errors, setErrors] = useState<{ areaSize?: string; speedMultiplier?: string }>({});
 
-  useEffect(() => setSelect(typeof lockpickData === 'string' ? lockpickData : 'custom'), [lockpickData]);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newErrors: typeof errors = {};
+    if (select === 'custom' && !areaSize) newErrors.areaSize = 'Obrigatório';
+    if (select === 'custom' && !speedMultiplier) newErrors.speedMultiplier = 'Obrigatório';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
-  const form = useForm<FormProps>({
-    initialValues: {
-      select,
-      areaSize: typeof lockpickData === 'string' ? null : lockpickData.areaSize,
-      speedMultiplier: typeof lockpickData === 'string' ? null : lockpickData.speedMultiplier,
-    },
-
-    validate: {
-      select: (value) => (value === null ? 'Difficulty is required' : null),
-      areaSize: (value, values) => (value === null && values.select === 'custom' ? 'Area size is required' : null),
-      speedMultiplier: (value, values) =>
-        value === null && values.select === 'custom' ? 'Speed multiplier is required' : null,
-    },
-  });
-
-  useEffect(() => form.setFieldValue('select', select), [select]);
-
-  const handleSubmit = (values: FormProps) => {
-    setModal((modal) => ({ ...modal, opened: false }));
-    const data =
-      values.select === 'custom'
-        ? { areaSize: values.areaSize, speedMultiplier: values.speedMultiplier }
-        : values.select;
+    setModal((m) => ({ ...m, opened: false }));
+    const data = select === 'custom' ? { areaSize, speedMultiplier } : select;
     if (!data) return;
     setLockpickDifficulty((prevState) => {
       const array = [...prevState];
-      if (!data) return array;
       // @ts-ignore
       array[modal.index] = data;
-
       return array;
     });
   };
 
   return (
-    <form onSubmit={form.onSubmit((values) => handleSubmit(values))}>
-      <Stack>
-        <Select
-          data={selectData}
-          placeholder="Dificuldade"
-          {...form.getInputProps('select')}
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-muted-foreground">Dificuldade</label>
+        <select
           value={select}
-          onChange={setSelect}
-          required
-        />
-        <NumberInput
-          label="Tamanho da área"
-          defaultValue={typeof lockpickData === 'object' ? lockpickData.areaSize : null}
-          description="Tamanho da área de verificação de habilidade em graus (máx 360)"
-          disabled={select !== 'custom'}
+          onChange={(e) => setSelect(e.target.value)}
+          className="h-8 px-2 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary text-foreground"
+        >
+          {selectData.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-muted-foreground">Tamanho da área (graus)</label>
+        <input
+          type="number"
+          value={areaSize}
           max={360}
-          hideControls
-          required={select === 'custom'}
-          {...form.getInputProps('areaSize')}
-        />
-        <NumberInput
-          label="Multiplicador de velocidade"
-          description="Número que a velocidade do indicador será multiplicada"
           disabled={select !== 'custom'}
-          defaultValue={typeof lockpickData === 'object' ? lockpickData.speedMultiplier : null}
-          hideControls
-          precision={2}
-          required={select === 'custom'}
-          {...form.getInputProps('speedMultiplier')}
+          onChange={(e) => setAreaSize(parseFloat(e.target.value) || 0)}
+          className="h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary text-foreground disabled:opacity-40"
         />
-        <Button type="submit" uppercase variant="light">
-          Confirmar
-        </Button>
-      </Stack>
+        {errors.areaSize && <p className="text-xs text-destructive">{errors.areaSize}</p>}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-medium text-muted-foreground">Multiplicador de velocidade</label>
+        <input
+          type="number"
+          value={speedMultiplier}
+          step={0.01}
+          disabled={select !== 'custom'}
+          onChange={(e) => setSpeedMultiplier(parseFloat(e.target.value) || 0)}
+          className="h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary text-foreground disabled:opacity-40"
+        />
+        {errors.speedMultiplier && <p className="text-xs text-destructive">{errors.speedMultiplier}</p>}
+      </div>
+
+      <button
+        type="submit"
+        className="w-full h-8 text-sm font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+      >
+        Confirmar
+      </button>
     </form>
   );
 };

@@ -1,5 +1,4 @@
-import { Group, TextInput, NumberInput, ActionIcon, Tooltip } from '@mantine/core';
-import { TbTrash } from 'react-icons/tb';
+import { Trash2 } from 'lucide-react';
 import { useStore, useSetters } from '../../../../../store';
 
 const GroupFields: React.FC = () => {
@@ -7,46 +6,42 @@ const GroupFields: React.FC = () => {
   const setGroups = useSetters((setter) => setter.setGroups);
 
   const handleChange = (value: string | number | undefined, index: number, property: 'name' | 'grade') => {
-    setGroups((prevState) => {
-      return prevState.map((item, indx) => (index === indx ? { ...item, [property]: value } : item));
-    });
+    setGroups((prevState) =>
+      prevState.map((item, indx) => (index === indx ? { ...item, [property]: value } : item))
+    );
   };
 
   const handleRowDelete = (index: number) => {
-    setGroups((prevState) => prevState.filter((obj, indx) => indx !== index));
+    setGroups((prevState) => prevState.filter((_obj, indx) => indx !== index));
   };
 
   return (
-    <>
+    <div className="space-y-2">
       {groups.map((field, index) => (
-        <Group
-          position="center"
-          key={`group-${index}`}
-          mt={index === 0 ? 0 : 16}
-          noWrap
-          spacing={16}
-          sx={{ fontSize: 16 }}
-        >
-          <TextInput
-            sx={{ width: '100%' }}
+        <div key={`group-${index}`} className="flex items-center gap-2">
+          <input
+            className="flex-1 h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
             placeholder="Grupo (police, ballas, etc.)"
             value={field.name as string}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, index, 'name')}
+            onChange={(e) => handleChange(e.target.value, index, 'name')}
           />
-          <NumberInput
-            sx={{ width: '100%' }}
-            placeholder="Cargo (0, 1, 2, 3, etc.)"
-            value={field.grade as number}
-            onChange={(e) => handleChange(e, index, 'grade')}
+          <input
+            type="number"
+            className="w-24 h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
+            placeholder="Cargo"
+            value={field.grade as number ?? ''}
+            onChange={(e) => handleChange(parseInt(e.target.value), index, 'grade')}
           />
-          <Tooltip label="Deletar linha">
-            <ActionIcon color="red.4" variant="transparent" onClick={() => handleRowDelete(index)}>
-              <TbTrash size={24} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+          <button
+            title="Deletar linha"
+            onClick={() => handleRowDelete(index)}
+            className="flex items-center justify-center w-8 h-8 rounded-md text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
       ))}
-    </>
+    </div>
   );
 };
 

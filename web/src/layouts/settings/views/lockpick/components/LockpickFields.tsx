@@ -1,7 +1,6 @@
-import { useSetters, useStore } from '../../../../../store';
-import { ActionIcon, Group, Modal, Select, Tooltip } from '@mantine/core';
 import { useState } from 'react';
-import { TbSettings, TbTrash } from 'react-icons/tb';
+import { Trash2, Settings } from 'lucide-react';
+import { useSetters, useStore } from '../../../../../store';
 import DifficultyModal from '../../characters/components/DifficultyModal';
 
 const selectData: { label: string; value: string }[] = [
@@ -17,50 +16,49 @@ const LockpickFields: React.FC = () => {
   const [modal, setModal] = useState<{ opened: boolean; index: number }>({ opened: false, index: 0 });
 
   const handleRowDelete = (index: number) => {
-    setLockpickFields((prevState) => prevState.filter((obj, indx) => indx !== index));
+    setLockpickFields((prevState) => prevState.filter((_obj, indx) => indx !== index));
   };
 
   return (
-    <>
+    <div className="space-y-2">
       {lockpickFields.map((field, index) => (
-        <Group
-          key={`${typeof field === 'string' ? field : field.areaSize}-${index}`}
-          sx={{ width: '100%' }}
-          spacing={16}
-          mt={index === 0 ? undefined : 16}
-          position="apart"
-        >
-          <Select
-            data={selectData}
+        <div key={`${typeof field === 'string' ? field : field?.areaSize}-${index}`} className="flex items-center gap-2">
+          <select
+            className="flex-1 h-8 px-2 text-sm bg-muted/50 border border-border rounded-md outline-none text-foreground"
             value={typeof field === 'string' ? field : 'custom'}
-            readOnly
-            placeholder="Edite as configurações se quiser personalizar"
-            sx={{ width: '80%' }}
-          />
-          <Tooltip label="Editar linha">
-            <ActionIcon color="blue.4" variant="transparent" onClick={() => setModal({ opened: true, index })}>
-              <TbSettings size={24} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Deletar linha">
-            <ActionIcon color="red.4" variant="transparent" onClick={() => handleRowDelete(index)}>
-              <TbTrash size={24} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
+            disabled
+          >
+            {selectData.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <button
+            title="Editar linha"
+            onClick={() => setModal({ opened: true, index })}
+            className="flex items-center justify-center w-8 h-8 rounded-md text-primary hover:bg-primary/10 transition-colors shrink-0"
+          >
+            <Settings size={15} />
+          </button>
+          <button
+            title="Deletar linha"
+            onClick={() => handleRowDelete(index)}
+            className="flex items-center justify-center w-8 h-8 rounded-md text-destructive hover:bg-destructive/10 transition-colors shrink-0"
+          >
+            <Trash2 size={15} />
+          </button>
+        </div>
       ))}
-      <Modal
-        opened={modal.opened}
-        onClose={() => setModal({ ...modal, opened: false })}
-        transition="fade"
-        title="Dificuldade da Lockpick"
-        centered
-        size="xs"
-        withCloseButton={false}
-      >
-        <DifficultyModal selectData={selectData} setModal={setModal} modal={modal} />
-      </Modal>
-    </>
+
+      {modal.opened && (
+        <>
+          <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm" onClick={() => setModal({ ...modal, opened: false })} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-64 bg-card border border-border rounded-xl shadow-2xl p-4">
+            <h3 className="text-sm font-semibold text-foreground mb-3">Dificuldade da Lockpick</h3>
+            <DifficultyModal selectData={selectData} setModal={setModal} modal={modal} />
+          </div>
+        </>
+      )}
+    </div>
   );
 };
 
