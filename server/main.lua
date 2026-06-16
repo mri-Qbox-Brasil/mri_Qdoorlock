@@ -121,9 +121,11 @@ local function createDoor(id, door, name)
 	door.id = id
 	door.name = name
 
+	local rand = math.random(100000, 999999)
+
 	if double then
 		for i = 1, 2 do
-			double[i].hash = joaat(('ox_door_%s_%s'):format(id, i))
+			double[i].hash = joaat(('ox_door_%s_%s_%s'):format(id, i, rand))
 
 			local coords = double[i].coords
 			double[i].coords = vector3(coords.x, coords.y, coords.z)
@@ -133,7 +135,7 @@ local function createDoor(id, door, name)
 			door.coords = double[1].coords - ((double[1].coords - double[2].coords) / 2)
 		end
 	else
-		door.hash = joaat(('ox_door_%s'):format(id))
+		door.hash = joaat(('ox_door_%s_%s'):format(id, rand))
 	end
 
 	door.coords = vector3(door.coords.x, door.coords.y, door.coords.z)
@@ -308,6 +310,14 @@ lib.callback.register('ox_doorlock:getDoors', function()
 end)
 
 RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
+	local source = source
+
+	if type(id) == 'table' then
+		id = false
+	else
+		id = tonumber(id) or id
+	end
+
 	if IsPlayerAceAllowed(source, 'command.doorlock') then
 		if data then
 			if not data.coords then
@@ -324,11 +334,12 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 			if data then
 				MySQL.update('UPDATE ox_doorlock SET name = ?, data = ? WHERE id = ?',
 					{ data.name, encodeData(data), id })
+				data = createDoor(id, data, data.name)
 			else
 				MySQL.update('DELETE FROM ox_doorlock WHERE id = ?', { id })
+				doors[id] = nil
 			end
 
-			doors[id] = data
 			TriggerClientEvent('ox_doorlock:editDoorlock', -1, id, data)
 		else
 			local insertId = MySQL.insert.await('INSERT INTO ox_doorlock (name, data) VALUES (?, ?)',

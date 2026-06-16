@@ -16,6 +16,12 @@ local function createDoor(door)
 		lib.grid.removeEntry(oldDoor)
 	end
 
+	if door.coords and type(door.coords) == 'table' then
+		door.coords = vec3(door.coords.x, door.coords.y, door.coords.z)
+	elseif door.coords and type(door.coords) == 'vector3' then
+		door.coords = vec3(door.coords.x, door.coords.y, door.coords.z)
+	end
+
 	doors[door.id] = door
 	local double = door.doors
 	door.zone = GetLabelText(GetNameOfZone(door.coords.x, door.coords.y, door.coords.z))
@@ -23,6 +29,11 @@ local function createDoor(door)
 
 	if double then
 		for i = 1, 2 do
+			if double[i].coords and type(double[i].coords) == 'table' then
+				double[i].coords = vec3(double[i].coords.x, double[i].coords.y, double[i].coords.z)
+			elseif double[i].coords and type(double[i].coords) == 'vector3' then
+				double[i].coords = vec3(double[i].coords.x, double[i].coords.y, double[i].coords.z)
+			end
 			AddDoorToSystem(double[i].hash, double[i].model, double[i].coords.x, double[i].coords.y, double[i].coords.z, false, false, false)
 			DoorSystemSetDoorState(double[i].hash, 4, false, false)
 			DoorSystemSetDoorState(double[i].hash, door.state, false, false)
@@ -60,8 +71,9 @@ lib.callback('ox_doorlock:getDoors', false, function(data)
 
 		for index = 1, nearbyDoorsCount do
 			local door = nearbyDoors[index]
-			local double = door.doors
-			door.distance = #(coords - door.coords)
+			if doors[door.id] == door then
+				local double = door.doors
+				door.distance = #(coords - door.coords)
 
 			if double then
 				for i = 1, 2 do
@@ -87,11 +99,12 @@ lib.callback('ox_doorlock:getDoors', false, function(data)
 					local sin, cos = math.sincos(heading)
 					local rotatedX = cos * center.x - sin * center.y
 					local rotatedY = sin * center.x + cos * center.y
-					door.coords = vec3(dCoords.x + rotatedX, dCoords.y + rotatedY, dCoords.z + center.z)
+					door.visualCoords = vec3(dCoords.x + rotatedX, dCoords.y + rotatedY, dCoords.z + center.z)
 					door.entity = entity
 
 					Entity(entity).state.doorId = door.id
 				else door.entity = nil end
+			end
 			end
 		end
 
@@ -178,64 +191,36 @@ end)
 RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 	if source == '' then return end
 
+	id = tonumber(id) or id
 	local door = doors[id]
-	local double = door.doors
-	local doorState = data and data.state or 0
 
-	lib.grid.removeEntry(door)
-
-	if data then
-		data.zone = door.zone or GetLabelText(GetNameOfZone(door.coords.x, door.coords.y, door.coords.z))
-		data.radius = data.maxDistance
-
-		if door.distance < 20 then door.distance = 80 end
-
-		lib.grid.addEntry(data)
-	elseif ClosestDoor?.id == id then
-		ClosestDoor = nil
-	end
-
-	if double then
-		for i = 1, 2 do
-			local doorHash = double[i].hash
-
-			if data then
-				if data.doorRate or door.doorRate or not data.auto then
-					DoorSystemSetAutomaticRate(doorHash, data.doorRate or door.doorRate and 0.0 or 10.0, false, false)
-				end
-
-				DoorSystemSetDoorState(doorHash, doorState, false, false)
-
-				if data.holdOpen then DoorSystemSetHoldOpen(doorHash, doorState == 0) end
-			else
-				DoorSystemSetDoorState(doorHash, 4, false, false)
-				DoorSystemSetDoorState(doorHash, 0, false, false)
-
+	if door then
+		local double = door.doors
+		if double then
+			for i = 1, 2 do
+				if double[i].hash then RemoveDoorFromSystem(double[i].hash) end
 				if double[i].entity then
 					Entity(double[i].entity).state.doorId = nil
 				end
 			end
-		end
-	else
-		if data then
-			if data.doorRate or door.doorRate or not data.auto then
-				DoorSystemSetAutomaticRate(door.hash, data.doorRate or door.doorRate and 0.0 or 10.0, false, false)
-			end
-
-			DoorSystemSetDoorState(door.hash, doorState, false, false)
-
-			if data.holdOpen then DoorSystemSetHoldOpen(door.hash, doorState == 0) end
 		else
-			DoorSystemSetDoorState(door.hash, 4, false, false)
-			DoorSystemSetDoorState(door.hash, 0, false, false)
-
+			if door.hash then RemoveDoorFromSystem(door.hash) end
 			if door.entity then
 				Entity(door.entity).state.doorId = nil
 			end
 		end
+		lib.grid.removeEntry(door)
 	end
 
-	doors[id] = data
+	if data then
+		Wait(500)
+		createDoor(data)
+	else
+		doors[id] = nil
+		if ClosestDoor?.id == id then
+			ClosestDoor = nil
+		end
+	end
 
 	if NuiHasLoaded then
 		SendNuiMessage(json.encode({
@@ -310,7 +295,8 @@ CreateThread(function()
 						local sprite = drawSprite[door.state]
 
 						if sprite then
-							SetDrawOrigin(door.coords.x, door.coords.y, door.coords.z)
+							local drawCoords = door.visualCoords or door.coords
+							SetDrawOrigin(drawCoords.x, drawCoords.y, drawCoords.z)
 							DrawSprite(sprite[1], sprite[2], sprite[3], sprite[4], sprite[5], sprite[6] * ratio, sprite[7], sprite[8], sprite[9], sprite[10], sprite[11])
 							ClearDrawOrigin()
 						end

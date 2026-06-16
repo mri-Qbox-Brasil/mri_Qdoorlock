@@ -22,9 +22,11 @@ end
 exports('getClosestDoorId', function() return ClosestDoor?.id end)
 exports('getDoorIdFromEntity', function(entityId) return getDoorFromEntity(entityId)?.id end) -- same as Entity(entityId).state.doorId
 
-local function entityIsNotDoor(data)
+local function entityIsNotDoor(data, allowedDoorId)
 	local entity = type(data) == 'number' and data or data.entity
-	return not getDoorFromEntity(entity)
+	local door = getDoorFromEntity(entity)
+	if door and door.id == allowedDoorId then return true end
+	return not door
 end
 
 PickingLock = false
@@ -126,7 +128,7 @@ RegisterNUICallback('createDoor', function(data, cb)
 		data.groups = nil
 	end
 
-	if not data.id then
+	if not data.id or data.reselect == true then
 		isAddingDoorlock = true
 		local doorCount = data.doors and 2 or 1
 		local lastEntity = 0
@@ -153,7 +155,7 @@ RegisterNUICallback('createDoor', function(data, cb)
 					100, false, false, 0, true, false, false, false)
 			end
 
-			if hit and entity > 0 and GetEntityType(entity) == 3 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity) then
+			if hit and entity > 0 and GetEntityType(entity) == 3 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id) then
 				if changedEntity then
 					SetEntityDrawOutline(entity, true)
 				end
@@ -184,6 +186,7 @@ RegisterNUICallback('createDoor', function(data, cb)
 			tempData[1].entity = nil
 			tempData[2].entity = nil
 			data.doors = tempData
+			data.coords = nil
 		else
 			data.model = tempData[1].model
 			data.coords = tempData[1].coords
@@ -206,6 +209,13 @@ RegisterNUICallback('createDoor', function(data, cb)
 	end
 
 	isAddingDoorlock = false
+
+	if data.reselect and data.id then
+		-- Delete the old door entirely
+		TriggerServerEvent('ox_doorlock:editDoorlock', data.id)
+		-- Strip the ID so the server creates a brand new door
+		data.id = nil
+	end
 
 	TriggerServerEvent('ox_doorlock:editDoorlock', data.id or false, data)
 	table.wipe(tempData)
