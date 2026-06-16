@@ -1,4 +1,4 @@
-import { Settings, Copy, MapPin, Trash2, Check, X } from 'lucide-react';
+import { Pencil, Copy, MapPin, Trash2, Check, X } from 'lucide-react';
 import { DoorColumn } from '../../../store/doors';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../../store';
@@ -21,14 +21,14 @@ const ActionsMenu: React.FC<{ data: CellContext<DoorColumn, unknown> }> = ({ dat
     <>
       <div className="flex items-center gap-1.5">
         <button
-          title="Configurações"
+          title="Editar porta"
           onClick={() => {
             useStore.setState(convertData(data.row.original), true);
             navigate('/settings/general');
           }}
           className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
         >
-          <Settings size={16} />
+          <Pencil size={16} />
         </button>
 
         <button

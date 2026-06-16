@@ -252,6 +252,10 @@ local function openUi(id)
 		action = 'setVisible',
 		data = id
 	}))
+	SendNUIMessage({
+		action = 'updateAccentColor',
+		color = GetConvar('mri:color', '#00E699')
+	})
 end
 
 RegisterNetEvent('ox_doorlock:triggeredCommand', function(closest)
@@ -315,5 +319,14 @@ CreateThread(function()
 				end
 			end
 		end)
+	end
+end)
+
+AddConvarChangeListener('mri:color', function(name)
+	if name == 'mri:color' then
+		SendNUIMessage({
+			action = 'updateAccentColor',
+			color = GetConvar('mri:color', '#00E699')
+		})
 	end
 end)

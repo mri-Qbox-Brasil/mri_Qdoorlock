@@ -8,6 +8,7 @@ import { useExitListener } from './hooks/useExitListener';
 import { useDoors } from './store/doors';
 import { DoorColumn } from './store/doors';
 import { convertData } from './utils/convertData';
+import ThemeSync from './components/ThemeSync';
 
 const App: React.FC = () => {
   const setSounds = useSetters((setter) => setter.setSounds);
@@ -58,6 +59,7 @@ const App: React.FC = () => {
 
   return (
     <div className="w-full h-full flex justify-center items-center p-8">
+      <ThemeSync />
       <div
         className={`
           transition-all duration-300 ease-in-out

@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useEffect, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Lock, Unlock, MapPin } from 'lucide-react';
 import { useSearch } from '../../../store/search';
 import { useDoors, type DoorColumn } from '../../../store/doors';
 import ActionsMenu from './ActionsMenu';
@@ -54,19 +54,40 @@ const DoorTable: React.FC = () => {
             return (
               <div
                 key={row.id}
-                className="flex items-center justify-between p-4 bg-card border border-border/50 rounded-xl hover:border-primary/50 transition-all group shadow-sm"
+                className="flex items-center justify-between p-5 bg-card/40 border border-border/40 rounded-2xl hover:bg-card hover:border-primary/40 transition-all duration-300 group shadow-sm hover:shadow-lg"
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-2 h-2 rounded-full ${door.state ? 'bg-destructive' : 'bg-primary'} shadow-[0_0_8px_currentColor]`} />
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-foreground text-sm tracking-wide">{door.name}</span>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      ID: {door.id} {door.zone ? `• Zona: ${door.zone}` : ''}
-                    </span>
+                <div className="flex items-center gap-5">
+                  <div className={`flex items-center justify-center w-10 h-10 rounded-xl ${door.state ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'} shadow-inner`}>
+                    {door.state ? <Lock size={18} /> : <Unlock size={18} />}
+                  </div>
+                  
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                      <span className="font-bold text-foreground text-base tracking-wide">{door.name}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${door.state ? 'bg-destructive/10 text-destructive border border-destructive/20' : 'bg-primary/10 text-primary border border-primary/20'}`}>
+                        {door.state ? 'Trancada' : 'Aberta'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <span className="opacity-60">ID:</span>
+                        <span className="text-foreground/80">{door.id}</span>
+                      </span>
+                      {door.zone && (
+                        <>
+                          <span className="w-1 h-1 rounded-full bg-border" />
+                          <span className="flex items-center gap-1.5">
+                            <MapPin size={12} className="opacity-60" />
+                            <span>{door.zone}</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="opacity-50 group-hover:opacity-100 transition-opacity">
-                  {/* Pass the row to ActionsMenu by wrapping it in a fake cell context to avoid rewriting ActionsMenu completely right now, or we can just adapt ActionsMenu to take 'door' */}
+                
+                <div className="transition-opacity duration-300">
                   <ActionsMenu data={{ row } as any} />
                 </div>
               </div>
