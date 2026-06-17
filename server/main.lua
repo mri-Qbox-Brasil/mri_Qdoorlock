@@ -276,43 +276,6 @@ MySQL.ready(function()
 		print("^2[mri_Qdoorlock] Instalação do banco de dados concluída com sucesso!^0")
 	end
 
-	-- Auto migration/schema update
-	local columns = MySQL.query.await("SHOW COLUMNS FROM `mri_qdoorlock` LIKE 'group_id'")
-	if not columns or #columns == 0 then
-		print("^2[mri_Qdoorlock] Adicionando coluna 'group_id' na tabela 'mri_qdoorlock'...^0")
-		local alterSuccess, alterErr = pcall(function()
-			MySQL.query.await("ALTER TABLE `mri_qdoorlock` ADD COLUMN `group_id` int(11) unsigned DEFAULT NULL")
-		end)
-		if alterSuccess then
-			print("^2[mri_Qdoorlock] Coluna 'group_id' adicionada com sucesso.^0")
-			-- Migrate existing data
-			local allDoors = MySQL.query.await("SELECT `id`, `data` FROM `mri_qdoorlock`")
-			if allDoors and #allDoors > 0 then
-				print("^2[mri_Qdoorlock] Migrando grupos de portas antigos para a nova coluna...^0")
-				for j = 1, #allDoors do
-					local d = allDoors[j]
-					local success, decoded = pcall(json.decode, d.data)
-					if success and decoded and decoded.doorGroupId then
-						local groupId = tonumber(decoded.doorGroupId)
-						if groupId then
-							MySQL.query.await("UPDATE `mri_qdoorlock` SET `group_id` = ? WHERE `id` = ?", { groupId, d.id })
-						end
-					end
-				end
-				print("^2[mri_Qdoorlock] Migração concluída com sucesso!^0")
-			end
-		else
-			print("^1[mri_Qdoorlock] Falha ao adicionar coluna 'group_id': " .. tostring(alterErr) .. "^0")
-		end
-	end
-
-	-- Garantir que a constraint de FK utilize ON DELETE CASCADE para deletar as portas ao deletar o grupo
-	pcall(function()
-		MySQL.query.await("ALTER TABLE `mri_qdoorlock` DROP FOREIGN KEY `fk_mri_qdoorlock_group`")
-	end)
-	pcall(function()
-		MySQL.query.await("ALTER TABLE `mri_qdoorlock` ADD CONSTRAINT `fk_mri_qdoorlock_group` FOREIGN KEY (`group_id`) REFERENCES `mri_qdoorlock_groups` (`id`) ON DELETE CASCADE")
-	end)
 
 	while Config.DoorList do Wait(100) end
 
