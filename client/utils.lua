@@ -475,7 +475,7 @@ Citizen.CreateThread(function()
 						
 						if door.id == targetedDoorId and not isAddingDoorlock then
 							text = text .. "\n~g~[ENTER]~w~ Editar | ~b~[G]~w~ Duplicar | ~r~[BACKSPACE]~w~ Deletar"
-							if IsControlJustPressed(0, 18) then
+							if IsControlJustPressed(0, 191) then
 								openUi(door.id)
 							elseif IsControlJustPressed(0, 47) then
 								local cloneData = json.decode(json.encode(door))
@@ -493,7 +493,7 @@ Citizen.CreateThread(function()
 								CreateThread(function()
 									handleCreateDoor(cloneData)
 								end)
-							elseif IsControlJustPressed(0, 177) then
+							elseif IsControlJustPressed(0, 194) then
 								SetNuiFocus(true, true)
 								SetTimecycleModifier('hud_def_blur')
 								SendNUIMessage({
