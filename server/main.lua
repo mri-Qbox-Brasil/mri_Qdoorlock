@@ -257,12 +257,23 @@ end
 local sql = LoadResourceFile(cache.resource, 'sql/mri_Qdoorlock.sql')
 
 MySQL.ready(function()
+	local tables = MySQL.query.await("SHOW TABLES LIKE 'mri_qdoorlock'")
+	local isFirstInstall = not tables or #tables == 0
+
+	if isFirstInstall then
+		print("^2[mri_Qdoorlock] Instalando tabelas do banco de dados pela primeira vez...^0")
+	end
+
 	if sql then
 		for query in string.gmatch(sql, "([^;]+)") do
 			if query:match("%S") then
 				MySQL.query.await(query)
 			end
 		end
+	end
+
+	if isFirstInstall then
+		print("^2[mri_Qdoorlock] Instalação do banco de dados concluída com sucesso!^0")
 	end
 
 	-- Auto migration/schema update
