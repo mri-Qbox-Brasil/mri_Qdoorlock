@@ -6,6 +6,7 @@ export interface DoorColumn extends Omit<StoreState, 'groups'> {
   name: string;
   zone: string;
   groups: { [k: string]: number };
+  doorGroupId?: number | null;
 }
 
 export const useDoors = create<{ doors: DoorColumn[]; setDoors: (value: DoorColumn[]) => void }>((set) => ({

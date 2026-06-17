@@ -17,5 +17,8 @@ export const convertData = (data: DoorColumn) => {
     groups: [...newGroupsData],
     items: data.items || [{ name: '', metadata: '', remove: false }],
     lockpickDifficulty: data.lockpickDifficulty || [''],
+    doorGroupId: data.doorGroupId || null,
+    passcodeType: data.passcodeType || 'text',
+    passcodeCoords: data.passcodeCoords || null,
   } as StoreState;
 };

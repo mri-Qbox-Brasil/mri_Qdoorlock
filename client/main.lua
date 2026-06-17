@@ -6,7 +6,9 @@ if not lib.checkDependency('ox_lib', '3.30.4', true) then return end
 
 local math = require 'glm'
 local doors = {}
+local doorGroups = {}
 _ENV.doors = doors
+_ENV.doorGroups = doorGroups
 
 
 local function createDoor(door)
@@ -60,7 +62,20 @@ local nearbyDoorsCount = 0
 local Entity = Entity
 local ratio = GetAspectRatio(true)
 
-lib.callback('ox_doorlock:getDoors', false, function(data)
+lib.callback('ox_doorlock:getDoors', false, function(data, sounds, groups)
+	if groups then
+		for k, v in pairs(groups) do
+			if v.coords then
+				local streetHash, crossingHash = GetStreetNameAtCoord(v.coords.x, v.coords.y, v.coords.z)
+				local streetName = GetStreetNameFromHashKey(streetHash)
+				if crossingHash ~= 0 then
+					streetName = streetName .. " - " .. GetStreetNameFromHashKey(crossingHash)
+				end
+				v.streetName = streetName
+			end
+			doorGroups[k] = v
+		end
+	end
 	for _, door in pairs(data) do createDoor(door) end
 
 	while true do
@@ -232,15 +247,31 @@ end)
 
 ClosestDoor = nil
 
+local passcodePromise = nil
+
+RegisterNUICallback('submitPasscode', function(passcode, cb)
+	cb(1)
+	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
+	if passcodePromise then
+		passcodePromise:resolve(passcode)
+		passcodePromise = nil
+	end
+end)
+
 lib.callback.register('ox_doorlock:inputPassCode', function()
-	return ClosestDoor?.passcode and lib.inputDialog(locale('door_lock'), {
-		{
-			type = 'input',
-			label = locale('passcode'),
-			password = true,
-			icon = 'lock'
-		},
-	})?[1]
+	if not ClosestDoor?.passcode then return end
+	
+	passcodePromise = promise.new()
+	SetNuiFocus(true, true)
+	SetTimecycleModifier('hud_def_blur')
+	SendNuiMessage(json.encode({
+		action = 'openPasscodePrompt',
+		data = { passcodeType = ClosestDoor.passcodeType or 'text' }
+	}))
+	
+	local result = Citizen.Await(passcodePromise)
+	return result
 end)
 
 local lastTriggered = 0

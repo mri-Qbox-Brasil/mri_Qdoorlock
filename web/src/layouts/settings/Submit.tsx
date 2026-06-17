@@ -3,6 +3,7 @@ import { useStore } from '../../store';
 import { fetchNui } from '../../utils/fetchNui';
 import { useClipboard } from '../../store/clipboard';
 import { useVisibility } from '../../store/visibility';
+import { useSelection } from '../../store/selection';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 
@@ -10,9 +11,14 @@ const Submit: React.FC = () => {
   const navigate = useNavigate();
   const clipboard = useClipboard((state) => state.clipboard);
   const setVisible = useVisibility((state) => state.setVisible);
+  const { selectedDoors, clearSelection } = useSelection();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmReselect, setConfirmReselect] = useState(false);
+
+  const passcode = useStore((state) => state.passcode);
+  const passcodeType = useStore((state) => state.passcodeType);
+  const hasValidationError = passcodeType === 'numeric' && passcode && /[^0-9]/.test(passcode);
 
   const handleSubmit = (reselect: boolean = false) => {
     const data = { ...useStore.getState() };
@@ -83,15 +89,25 @@ const Submit: React.FC = () => {
     }
 
     setVisible(false);
-    fetchNui('createDoor', data);
+    
+    if (data.isBulkEdit) {
+      fetchNui('editDoorsBulk', {
+        doorIds: selectedDoors,
+        changes: data
+      });
+      clearSelection();
+    } else {
+      fetchNui('createDoor', data);
+    }
   };
 
   const hasId = !!useStore.getState().id;
+  const isBulkEdit = useStore.getState().isBulkEdit;
 
   return (
     <>
       <div className="flex flex-col gap-2 pt-3 border-t border-border">
-        {hasId && (
+        {hasId && !isBulkEdit && (
           <button
             onClick={() => setConfirmReselect(true)}
             className="w-full flex items-center justify-center gap-2 h-9 rounded-md border border-primary/50 text-primary hover:bg-primary/10 text-sm font-semibold transition-colors"
@@ -103,8 +119,9 @@ const Submit: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => hasId ? setConfirmSave(true) : handleSubmit(false)}
-            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+            onClick={() => (hasId && !isBulkEdit) ? setConfirmSave(true) : handleSubmit(false)}
+            disabled={hasValidationError as boolean}
+            className="flex-1 flex items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={15} />
             Salvar Porta

@@ -7,6 +7,8 @@ export interface StoreState {
   id?: number;
   name: StringField;
   passcode: StringField;
+  passcodeType: StringField;
+  passcodeCoords?: { x: number; y: number; z: number } | null;
   autolock: NumberField;
   items: { name: StringField; metadata?: StringField; remove: boolean | null }[];
   characters: StringField[];
@@ -22,6 +24,8 @@ export interface StoreState {
   hideUi: boolean | null;
   doors: boolean | null;
   holdOpen: boolean | null;
+  doorGroupId?: number | null;
+  isBulkEdit?: boolean;
 }
 
 interface StateSetters {
@@ -31,6 +35,8 @@ interface StateSetters {
   setUnlockSound: (value: StoreState['unlockSound']) => void;
   setName: (value: StoreState['name']) => void;
   setPasscode: (value: StoreState['passcode']) => void;
+  setPasscodeType: (value: StoreState['passcodeType']) => void;
+  setPasscodeCoords: (value: StoreState['passcodeCoords']) => void;
   setAutolock: (value: StoreState['autolock']) => void;
   setItems: (fn: (state: StoreState['items']) => StoreState['items']) => void;
   setCharacters: (fn: (state: StoreState['characters']) => StoreState['characters']) => void;
@@ -44,6 +50,8 @@ interface StateSetters {
 export const useStore = create<StoreState>(() => ({
   name: '',
   passcode: '',
+  passcodeType: 'text',
+  passcodeCoords: null,
   autolock: 0,
   items: [{ name: '', metadata: '', remove: false }],
   characters: [''],
@@ -59,6 +67,8 @@ export const useStore = create<StoreState>(() => ({
   hideUi: false,
   doors: false,
   holdOpen: false,
+  isBulkEdit: false,
+  doorGroupId: null,
 }));
 
 export const defaultState = useStore.getState();
@@ -70,6 +80,8 @@ export const useSetters = create<StateSetters>((set: SetState<StateSetters>, get
   setUnlockSound: (value) => useStore.setState({ unlockSound: value }),
   setName: (value) => useStore.setState({ name: value }),
   setPasscode: (value: StoreState['passcode']) => useStore.setState({ passcode: value }),
+  setPasscodeType: (value: StoreState['passcodeType']) => useStore.setState({ passcodeType: value }),
+  setPasscodeCoords: (value: StoreState['passcodeCoords']) => useStore.setState({ passcodeCoords: value }),
   setAutolock: (value: StoreState['autolock']) => useStore.setState({ autolock: value }),
   // @ts-ignore
   toggleCheckbox: (type) => useStore.setState((state) => ({ [type]: !state[type] })),
