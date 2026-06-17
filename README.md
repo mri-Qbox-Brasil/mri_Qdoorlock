@@ -42,6 +42,10 @@ This will output the new UI files to the `web/build` folder, which the FiveM res
 - `/doorlock` - Opens the management UI (Requires ACE permission: `command.doorlock`).
 - From the UI, you can toggle debug mode, create groups, add new doors, set passcodes, and teleport to specific doors.
 
+## 👏 Credits
+
+This project was originally forked from and built upon the incredible work of the **[Overextended](https://github.com/overextended)** team, specifically their `ox_doorlock` resource. All foundational credit goes to them for creating such an optimized and robust system for the FiveM community.
+
 ## 📝 License
 
 This project retains the original GPL-3.0-or-later license from Overextended. Modifications by `.mur4i` / MRI Newage.
