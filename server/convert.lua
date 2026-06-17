@@ -26,7 +26,7 @@ MySQL.ready(function()
 	end
 
 	local query =
-	'INSERT INTO `ox_doorlock` (`name`, `data`) SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM `ox_doorlock` WHERE `name` = ?)'
+	'INSERT INTO `mri_qdoorlock` (`name`, `data`) SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM `mri_qdoorlock` WHERE `name` = ?)'
 	local queries = {}
 
 	for i = 1, fileCount do
