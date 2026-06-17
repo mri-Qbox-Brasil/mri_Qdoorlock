@@ -1,130 +1,47 @@
-# Ox Doorlock
+# mri_Qdoorlock 🚪
 
-Door management resource, with compatibility for [ox_core](https://github.com/overextended/ox_core), [es_extended](https://github.com/esx-framework/esx_core), [nd_core](https://github.com/ND-Framework/ND_Core), and [qbox](https://github.com/Qbox-project/qbx_core).  
-Successor to nui_doorlock with less scuff and more stuff.
+An advanced, highly optimized, and robust doorlock system for FiveM, heavily based on the foundation of `ox_doorlock` but with major architectural improvements and an integrated management UI.
 
-_The UI needs to be built - use the [latest release](https://github.com/overextended/ox_doorlock/releases/latest/download/ox_doorlock.zip) if you want to drag-n-drop._
+## 🌟 Key Features
 
-## Dependencies
+- **Automatic SQL Installation**: No more manual database imports! The script automatically detects if the database exists and installs the necessary tables on the first server startup.
+- **Door Groups System**: Manage doors efficiently by assigning them to groups (zones/departments like MRPD, Pillbox, etc). Deleting a group cascades and cleanly deletes all associated doors.
+- **Modern Management UI**: Built with **React 18**, **Vite**, **Zustand**, and **TailwindCSS**. Manage your doors, passcodes, permissions, and lockpick settings visually in-game.
+- **Editable UI Source Code**: The `web/` folder contains all the source code. Developers can modify the UI, add new features, and rebuild it using `npm run build`.
+- **High Performance**: Client-side logic utilizes `lib.grid` to ensure 0.00ms resmon when away from doors, only rendering nearby doors dynamically.
+- **Advanced Permissions**: Lock/unlock doors using framework Jobs/Gangs, citizen IDs, specific inventory Items (keys), or numeric Passcodes.
+- **Native Door System**: Integrates deeply with GTA V's native `DoorSystem`, ensuring perfect physics sync, sliding doors, and double-door support.
+- **Lockpicking Minigame**: Built-in support for lockpicking doors that allow it, using skill checks.
 
-### [oxmysql](https://github.com/overextended/oxmysql)
+## 🛠️ Requirements
 
-Doors are stored in a database for ease-of-use and to allow data to be easily cleared or shared.
+- [oxmysql](https://github.com/overextended/oxmysql) (v2.4.0+)
+- [ox_lib](https://github.com/overextended/ox_lib) (v3.30.4+)
 
-mysql-async is no longer supported.
-  - does not support error-catching (pcall)
-  - people use older versions which do not support parameters as arrays
-  - it isn't maintained and has issues that will never be resolved
+## 📥 Installation
 
-### [ox_lib](https://github.com/overextended/ox_lib) (v2.3.0 or higher)
+1. Download the repository and place it in your `resources` folder.
+2. Ensure you have `oxmysql` and `ox_lib` installed and started before `mri_Qdoorlock`.
+3. Add `ensure mri_Qdoorlock` to your `server.cfg`.
+4. Start your server. The script will automatically create the `mri_qdoorlock` and `mri_qdoorlock_groups` tables in your database.
 
-Used for some UI elements (i.e. notifications, progress circle, input), and cache.
+## 💻 Modifying the UI
 
-### [ox_target](https://github.com/overextended/ox_target) (preferred) or [qtarget](https://github.com/overextended/qtarget) (deprecated)
+The UI is built using Vite and React. The pre-built files are already included in `web/build`, so the script is **plug-and-play**.
 
-(Optional) Used for lockpicking.
+If you wish to modify the interface:
+1. Navigate to the `web` folder: `cd web`
+2. Install dependencies: `npm install`
+3. Start the dev server (optional): `npm run start`
+4. Build for production: `npm run build`
 
-## Usage
+This will output the new UI files to the `web/build` folder, which the FiveM resource reads.
 
-Use the `/doorlock` command to open the UI and enter the settings for your new door.  
-Once you confirm the settings, activate your targeting resource (typically LALT) to select the entity (or entities) to use.
+## 🎮 In-Game Commands
 
-Adding any arguments after the command will open the closest door to you, to easily modify it.
+- `/doorlock` - Opens the management UI (Requires ACE permission: `command.doorlock`).
+- From the UI, you can toggle debug mode, create groups, add new doors, set passcodes, and teleport to specific doors.
 
-## Conversion
+## 📝 License
 
-Placing nui_doorlock config files into the `convert` folder will convert the data and insert it into the database.  
-Success is _not_ guaranteed if using a fork on nui_doorlock, like the qb version.
-
-## Client API
-
-- Use the closest door. Still performs server-side checks, so may fail.
-
-```lua
-exports.ox_doorlock:useClosestDoor()
-```
-
-- Pick the lock of the closest door. Still performs server-side checks, so may fail.
-
-```lua
-exports.ox_doorlock:pickClosestDoor()
-```
-
-## Server API
-
-- Get data for door
-
-```lua
-local mrpd_locker_rooms = exports.ox_doorlock:getDoor(1)
-local mrpd_locker_rooms = exports.ox_doorlock:getDoorFromName('mrpd locker rooms')
-```
-
-- Set door state (0: unlocked, 1: locked)
-
-```lua
-TriggerEvent('ox_doorlock:setState', mrpd_locker_rooms.id, state)
-```
-
-- Listen for event when door is toggled
-
-```lua
-AddEventHandler('ox_doorlock:stateChanged', function(source, doorId, state, usedItem)
-    if usedItem == 'trainticket' then
-        local xPlayer = ESX.GetPlayerFromId(source)
-        xPlayer.removeInventoryItem(usedItem, 1)
-    end
-end)
-```
-
-## Door Settings
-
-### General
-
-- Door name
-  - Used to easily identify the door.
-- Passcode
-  - Door can be unlocked by anybody by using the code or phrase.
-- Autolock interval
-  - Door will be locked after x seconds.
-- Interact distance
-  - Door can only be used when within x metres.
-- Door rate
-  - Door movement speed for sliding/garage/automatic doors, or swinging doors when locked.
-- Locked
-  - Sets the door as locked by default.
-- Double
-  - Door is a set of two doors, controlled together.
-- Automatic
-  - Sliding/garage/automatic door.
-- Lockpick
-  - Door can be lockpicked when interacting with a targeting resource.
-- Hide UI
-  - No indicators (i.e. icon, text) will display on the door.
-
-### Characters
-
-- Character Id
-  - Character identifier used by a framework (i.e. player.charid, xPlayer.identifier, Player.CitizenId).
-
-### Groups
-
-- Group
-  - Framework dependent, referring to jobs, gangs, etc.
-- Grade
-  - The minimum grade to allow access for the group (0 to allow all).
-
-### Items
-
-- Item
-  - Name of the item.
-- Metadata type
-  - Requires metadata support (i.e. ox_inventory) to check slot.metadata.type
-
-### Lockpick
-
-- Difficulty
-  - Sets the skillcheck difficulty (see [docs](https://overextended.github.io/docs/ox_lib/Interface/Client/skillcheck)).
-- Area size
-  - Custom difficulty area size.
-- Speed multiplier
-  - Custom difficulty idicator speed.
+This project retains the original GPL-3.0-or-later license from Overextended. Modifications by `.mur4i` / MRI Newage.
