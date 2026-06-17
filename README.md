@@ -48,4 +48,4 @@ This project was originally forked from and built upon the incredible work of th
 
 ## 📝 License
 
-This project retains the original GPL-3.0-or-later license from Overextended. Modifications by `.mur4i` / MRI Newage.
+This project retains the original GPL-3.0-or-later license from Overextended. Modifications by `.mur4i` `.gordela`
