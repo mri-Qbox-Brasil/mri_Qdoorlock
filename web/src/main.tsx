@@ -16,6 +16,7 @@ debugData<DoorColumn[]>([
       {
         name: 'Door name',
         passcode: 'Supersecret123',
+        passcodeType: 'text',
         autolock: 300,
         id: 0,
         zone: 'Mission Row',

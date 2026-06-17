@@ -1,5 +1,8 @@
 local Entity = Entity
 
+local debugGroupId = nil
+local outlinedEntities = {}
+
 local function getDoorFromEntity(data)
 	local entity = type(data) == 'table' and data.entity or data
 
@@ -106,9 +109,9 @@ RegisterNUICallback('notify', function(data, cb)
 	lib.notify({ title = data })
 end)
 
-RegisterNUICallback('createDoor', function(data, cb)
-	cb(1)
+local function handleCreateDoor(data)
 	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
 
 	data.state = (data.state == true or data.state == 1) and 1 or 0
 
@@ -135,16 +138,67 @@ RegisterNUICallback('createDoor', function(data, cb)
 
 		lib.showTextUI(locale('add_door_textui'))
 
+		-- Helper: raycast first, fall back to object proximity scan for doors
+		-- with no raycast-detectable collision (e.g. DoorSystem-managed grates)
+		local function getTargetEntity()
+			local hit, ent, coord = lib.raycast.cam(-1, cache.ped)
+			local entType = hit and ent and GetEntityType(ent) or 0
+			-- If raycast found a valid prop entity, return it directly
+			if hit and ent > 0 and entType == 3 then
+				return hit, ent, coord
+			end
+			-- Fallback: scan nearby objects along the camera ray
+			-- This handles doors managed by GTA's native DoorSystem (no raycast collision)
+			local camPos = GetGameplayCamCoord()
+			local camRot = GetGameplayCamRot(2)
+			local radX = math.rad(camRot.x)
+			local radZ = math.rad(camRot.z)
+			local camDir = vector3(
+				-math.sin(radZ) * math.cos(radX),
+				math.cos(radZ) * math.cos(radX),
+				math.sin(radX)
+			)
+			local bestHandle = 0
+			local bestProj = math.huge
+			local handle, object = FindFirstObject()
+			local found = true
+			while found do
+				if DoesEntityExist(object) and GetEntityType(object) == 3 then
+					local objPos = GetEntityCoords(object)
+					local toObj = objPos - camPos
+					local proj = toObj.x * camDir.x + toObj.y * camDir.y + toObj.z * camDir.z
+					if proj > 0.3 and proj < 8.0 then
+						local cx = toObj.y * camDir.z - toObj.z * camDir.y
+						local cy = toObj.z * camDir.x - toObj.x * camDir.z
+						local cz = toObj.x * camDir.y - toObj.y * camDir.x
+						local rayDist = math.sqrt(cx*cx + cy*cy + cz*cz)
+						if rayDist < 1.2 and proj < bestProj then
+							bestProj = proj
+							bestHandle = object
+						end
+					end
+				end
+				found, object = FindNextObject(handle)
+			end
+			EndFindObject(handle)
+			if bestHandle ~= 0 then
+				return true, bestHandle, GetEntityCoords(bestHandle)
+			end
+			return hit, ent, coord
+		end
+
 		repeat
 			DisablePlayerFiring(cache.playerId, true)
 			DisableControlAction(0, 25, true)
 
-			local hit, entity, coords = lib.raycast.cam(1|16)
+			local hit, entity, coords = getTargetEntity()
 			local changedEntity = lastEntity ~= entity
 			local doorA = tempData[1]?.entity
 
 			if changedEntity and lastEntity ~= doorA then
-				SetEntityDrawOutline(lastEntity, false)
+				if not outlinedEntities[lastEntity] then
+					SetEntityDrawOutline(lastEntity, false)
+				end
 			end
 
 			lastEntity = entity
@@ -155,7 +209,7 @@ RegisterNUICallback('createDoor', function(data, cb)
 					100, false, false, 0, true, false, false, false)
 			end
 
-			if hit and entity > 0 and GetEntityType(entity) == 3 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id) then
+			if hit and entity > 0 and GetEntityType(entity) ~= 0 and GetEntityType(entity) ~= 1 and GetEntityType(entity) ~= 2 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id) then
 				if changedEntity then
 					SetEntityDrawOutline(entity, true)
 				end
@@ -166,23 +220,31 @@ RegisterNUICallback('createDoor', function(data, cb)
 			end
 
 			if IsDisabledControlJustPressed(0, 25) then
-				SetEntityDrawOutline(entity, false)
+				if not outlinedEntities[entity] then
+					SetEntityDrawOutline(entity, false)
+				end
 
 				if not doorA then
 					isAddingDoorlock = false
 					return lib.hideTextUI()
 				end
 
-				SetEntityDrawOutline(doorA, false)
+				if not outlinedEntities[doorA] then
+					SetEntityDrawOutline(doorA, false)
+				end
 				table.wipe(tempData)
 			end
 		until tempData[doorCount]
 
 		lib.hideTextUI()
-		SetEntityDrawOutline(tempData[1].entity, false)
+		if not outlinedEntities[tempData[1].entity] then
+			SetEntityDrawOutline(tempData[1].entity, false)
+		end
 
 		if data.doors then
-			SetEntityDrawOutline(tempData[2].entity, false)
+			if not outlinedEntities[tempData[2].entity] then
+				SetEntityDrawOutline(tempData[2].entity, false)
+			end
 			tempData[1].entity = nil
 			tempData[2].entity = nil
 			data.doors = tempData
@@ -219,6 +281,11 @@ RegisterNUICallback('createDoor', function(data, cb)
 
 	TriggerServerEvent('ox_doorlock:editDoorlock', data.id or false, data)
 	table.wipe(tempData)
+end
+
+RegisterNUICallback('createDoor', function(data, cb)
+	cb(1)
+	handleCreateDoor(data)
 end)
 
 RegisterNUICallback('deleteDoor', function(id, cb)
@@ -226,20 +293,313 @@ RegisterNUICallback('deleteDoor', function(id, cb)
 	TriggerServerEvent('ox_doorlock:editDoorlock', id)
 end)
 
+RegisterNUICallback('deleteDoorsBulk', function(doorIds, cb)
+	cb(1)
+	if type(doorIds) ~= 'table' then return end
+	
+	Citizen.CreateThread(function()
+		for _, doorId in ipairs(doorIds) do
+			local id = tonumber(doorId) or doorId
+			TriggerServerEvent('ox_doorlock:editDoorlock', id)
+			Wait(150)
+		end
+	end)
+end)
+
+RegisterNUICallback('editDoorsBulk', function(data, cb)
+	cb(1)
+	if type(data.doorIds) ~= 'table' or type(data.changes) ~= 'table' then return end
+	
+	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
+	
+	Citizen.CreateThread(function()
+		for _, doorId in ipairs(data.doorIds) do
+			local id = tonumber(doorId) or doorId
+			local door = doors[id]
+			if door then
+				local fullData = {}
+				for k, v in pairs(door) do fullData[k] = v end
+				local updatableKeys = {
+					'state', 'passcode', 'passcodeType', 'passcodeCoords', 'autolock', 'maxDistance', 'doorRate', 
+					'auto', 'lockpick', 'hideUi', 'holdOpen', 'items', 'characters', 
+					'groups', 'lockpickDifficulty', 'lockSound', 'unlockSound'
+				}
+				
+				for _, key in ipairs(updatableKeys) do
+					fullData[key] = data.changes[key]
+				end
+				
+				fullData.state = (fullData.state == true or fullData.state == 1) and 1 or 0
+				
+				if fullData.items and not next(fullData.items) then fullData.items = nil end
+				if fullData.characters and not next(fullData.characters) then fullData.characters = nil end
+				if fullData.lockpickDifficulty and not next(fullData.lockpickDifficulty) then fullData.lockpickDifficulty = nil end
+				if fullData.groups and not next(fullData.groups) then fullData.groups = nil end
+				
+				TriggerServerEvent('ox_doorlock:editDoorlock', doorId, fullData)
+				Wait(150)
+			end
+		end
+	end)
+end)
+
 RegisterNUICallback('teleportToDoor', function(id, cb)
 	cb(1)
 	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
 	local doorCoords = doors[id].coords
 	if not doorCoords then return end
 	SetEntityCoords(cache.ped, doorCoords.x, doorCoords.y, doorCoords.z, false, false, false, false)
 end)
 
+RegisterNUICallback('teleportToGroup', function(id, cb)
+	cb(1)
+	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
+	local group = doorGroups[id]
+	if not group or not group.coords then return end
+	SetEntityCoords(cache.ped, group.coords.x, group.coords.y, group.coords.z, false, false, false, false)
+end)
+
+local function ClearOutlines()
+    for ent, _ in pairs(outlinedEntities) do
+        if DoesEntityExist(ent) then
+            SetEntityDrawOutline(ent, false)
+        end
+    end
+    table.wipe(outlinedEntities)
+end
+
+local function DrawText3D(x, y, z, text)
+    local onScreen, _x, _y = World3dToScreen2d(x, y, z)
+    if onScreen then
+        SetTextScale(0.40, 0.40)
+        SetTextFont(4)
+        SetTextProportional(1)
+        SetTextColour(255, 255, 255, 255)
+        SetTextDropShadow(0, 0, 0, 0, 255)
+        SetTextEdge(1, 0, 0, 0, 255)
+        SetTextDropShadow()
+        SetTextOutline()
+        SetTextEntry("STRING")
+        SetTextCentre(1)
+        AddTextComponentString(text)
+        DrawText(_x, _y)
+    end
+end
+
+RegisterNUICallback('toggleGroupDebug', function(groupId, cb)
+	cb(1)
+	if debugGroupId == groupId then
+		debugGroupId = nil
+		ClearOutlines()
+	else
+		ClearOutlines()
+		debugGroupId = groupId
+	end
+end)
+local rayEntity = 0
+Citizen.CreateThread(function()
+	while true do
+		if debugGroupId then
+			local hit, ent = lib.raycast.cam(1|16, PlayerPedId(), 80.0)
+			rayEntity = hit and ent or 0
+			Wait(50)
+		else
+			Wait(1000)
+		end
+	end
+end)
+
+Citizen.CreateThread(function()
+	while true do
+		local sleep = 1000
+		if debugGroupId then
+			sleep = 0
+			local playerCoords = GetEntityCoords(cache.ped)
+			local currentEntities = {}
+			
+			local targetedDoorId = nil
+			local closestDist = 2.5
+			
+			-- Pass 1: Find targeted door and outline entities
+			for _, door in pairs(doors) do
+				if door.doorGroupId == debugGroupId and door.coords then
+					local dist = #(playerCoords - door.coords)
+					local isAimingAtDoor = false
+					
+					if door.doors then
+						for i = 1, 2 do
+							local d = door.doors[i]
+							if d.coords then
+								local ent = GetClosestObjectOfType(d.coords.x, d.coords.y, d.coords.z, 2.0, d.model or d.hash, false, false, false)
+								if ent > 0 then
+									currentEntities[ent] = true
+									if ent == rayEntity then isAimingAtDoor = true end
+									if not outlinedEntities[ent] then
+										SetEntityDrawOutline(ent, true)
+										outlinedEntities[ent] = true
+									end
+								end
+							end
+						end
+					else
+						local ent = GetClosestObjectOfType(door.coords.x, door.coords.y, door.coords.z, 2.0, door.model or door.hash, false, false, false)
+						if ent > 0 then
+							currentEntities[ent] = true
+							if ent == rayEntity then isAimingAtDoor = true end
+							if not outlinedEntities[ent] then
+								SetEntityDrawOutline(ent, true)
+								outlinedEntities[ent] = true
+							end
+						end
+					end
+					
+					if isAimingAtDoor and dist < 80.0 then
+						targetedDoorId = door.id
+						closestDist = -1
+					elseif closestDist > 0 and dist < closestDist then
+						closestDist = dist
+						targetedDoorId = door.id
+					end
+				end
+			end
+			
+			-- Pass 2: Draw text and handle interaction
+			for _, door in pairs(doors) do
+				if door.doorGroupId == debugGroupId and door.coords then
+					local dist = #(playerCoords - door.coords)
+					if dist < 100.0 then
+						local text = ("[%s] %s"):format(door.id, door.name)
+						
+						if door.id == targetedDoorId and not isAddingDoorlock then
+							text = text .. "\n~g~[ENTER]~w~ Editar | ~b~[G]~w~ Duplicar | ~r~[BACKSPACE]~w~ Deletar"
+							if IsControlJustPressed(0, 18) then
+								openUi(door.id)
+							elseif IsControlJustPressed(0, 47) then
+								local cloneData = json.decode(json.encode(door))
+								cloneData.id = nil
+								
+								local baseName, numStr = string.match(door.name or "Porta", "^(.-)%s*(%d+)$")
+								if baseName then
+									cloneData.name = baseName .. (baseName == "" and "" or " ") .. tostring(tonumber(numStr) + 1)
+								else
+									cloneData.name = (door.name or "Porta") .. " 2"
+								end
+								
+								cloneData.reselect = true
+								
+								CreateThread(function()
+									handleCreateDoor(cloneData)
+								end)
+							elseif IsControlJustPressed(0, 177) then
+								SetNuiFocus(true, true)
+								SetTimecycleModifier('hud_def_blur')
+								SendNUIMessage({
+									action = 'confirmDeleteDoor',
+									data = door.id
+								})
+							end
+						end
+						DrawText3D(door.coords.x, door.coords.y, door.coords.z + 0.5, text)
+					end
+				end
+			end
+			
+			for ent, _ in pairs(outlinedEntities) do
+				if not currentEntities[ent] then
+					if DoesEntityExist(ent) then
+						SetEntityDrawOutline(ent, false)
+					end
+					outlinedEntities[ent] = nil
+				end
+			end
+		end
+		Wait(sleep)
+	end
+end)
+
 RegisterNUICallback('exit', function(_, cb)
 	cb(1)
 	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
 end)
 
-local function openUi(id)
+RegisterNUICallback('createGroup', function(data, cb)
+	cb(1)
+	if not data or not data.name or type(data.name) ~= 'string' then return end
+	local coords = GetEntityCoords(cache.ped)
+	TriggerServerEvent('ox_doorlock:editGroup', false, {
+		name = data.name,
+		coords = coords
+	})
+end)
+
+RegisterNUICallback('deleteGroup', function(id, cb)
+	cb(1)
+	local groupId = tonumber(id) or id
+	TriggerServerEvent('ox_doorlock:editGroup', groupId)
+end)
+
+RegisterNUICallback('moveDoorToGroup', function(data, cb)
+	cb(1)
+	local doorId = tonumber(data.doorId) or data.doorId
+	local door = doors[doorId]
+	if door then
+		local newDoorData = {}
+		for k, v in pairs(door) do newDoorData[k] = v end
+		newDoorData.doorGroupId = data.groupId
+		TriggerServerEvent('ox_doorlock:editDoorlock', data.doorId, newDoorData)
+	end
+end)
+
+RegisterNUICallback('moveDoorsToGroup', function(data, cb)
+	cb(1)
+	if type(data.doorIds) ~= 'table' then return end
+	
+	Citizen.CreateThread(function()
+		for _, doorId in ipairs(data.doorIds) do
+			local id = tonumber(doorId) or doorId
+			local door = doors[id]
+			if door then
+				local newDoorData = {}
+				for k, v in pairs(door) do newDoorData[k] = v end
+				newDoorData.doorGroupId = data.groupId
+				TriggerServerEvent('ox_doorlock:editDoorlock', doorId, newDoorData)
+				Wait(150)
+			end
+		end
+	end)
+end)
+
+RegisterNetEvent('ox_doorlock:updateGroup', function(id, data)
+	if data then
+		if data.coords then
+			local streetHash, crossingHash = GetStreetNameAtCoord(data.coords.x, data.coords.y, data.coords.z)
+			local streetName = GetStreetNameFromHashKey(streetHash)
+			if crossingHash ~= 0 then
+				streetName = streetName .. " - " .. GetStreetNameFromHashKey(crossingHash)
+			end
+			data.streetName = streetName
+		end
+		doorGroups[data.id] = data
+	else
+		doorGroups[id] = nil
+	end
+
+	if NuiHasLoaded then
+		SendNuiMessage(json.encode({
+			action = 'updateDoorGroups',
+			data = {
+				id = data and data.id or id,
+				data = data
+			}
+		}, { with_hole = false }))
+	end
+end)
+
+function openUi(id)
 	if source == '' or isAddingDoorlock then return end
 
 	if not NuiHasLoaded then
@@ -251,6 +611,12 @@ local function openUi(id)
 		}, { with_hole = false }))
 		Wait(100)
 
+		SendNuiMessage(json.encode({
+			action = 'updateDoorGroups',
+			data = doorGroups
+		}, { with_hole = false }))
+		Wait(100)
+
 		SendNUIMessage({
 			action = 'setSoundFiles',
 			data = lib.callback.await('ox_doorlock:getSounds', false)
@@ -258,6 +624,7 @@ local function openUi(id)
 	end
 
 	SetNuiFocus(true, true)
+	SetTimecycleModifier('hud_def_blur')
 	SendNuiMessage(json.encode({
 		action = 'setVisible',
 		data = id

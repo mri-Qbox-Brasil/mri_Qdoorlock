@@ -6,11 +6,13 @@ interface Props {
   value?: string | number;
   setValue: (value: any) => void;
   tooltip?: string;
+  disabled?: boolean;
+  error?: string;
 }
 
-const Input: React.FC<Props> = ({ label, type, tooltip, value, setValue }) => {
+const Input: React.FC<Props> = ({ label, type, tooltip, value, setValue, disabled, error }) => {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col gap-1 ${disabled ? 'opacity-60' : ''}`}>
       <div className="flex items-center gap-1">
         <label className="text-xs font-medium text-muted-foreground">{label}</label>
         {tooltip && (
@@ -25,10 +27,12 @@ const Input: React.FC<Props> = ({ label, type, tooltip, value, setValue }) => {
       <input
         type={type}
         value={value}
+        disabled={disabled}
         step={type === 'number' ? 0.1 : undefined}
         onChange={(e) => setValue(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
-        className="h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
+        className={`h-8 px-3 text-sm bg-muted/50 border ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-border focus:ring-primary focus:border-primary'} rounded-md outline-none focus:ring-1 text-foreground placeholder:text-muted-foreground transition-all ${disabled ? 'cursor-not-allowed' : ''}`}
       />
+      {error && <span className="text-[10px] text-red-500 -mt-0.5">{error}</span>}
     </div>
   );
 };

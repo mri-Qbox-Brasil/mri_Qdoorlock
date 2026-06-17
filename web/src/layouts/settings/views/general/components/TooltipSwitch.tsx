@@ -5,9 +5,10 @@ interface Props {
   tooltip?: string;
   value: boolean;
   toggle: () => void;
+  disabled?: boolean;
 }
 
-const TooltipSwitch: React.FC<Props> = ({ tooltip, label, value, toggle }) => {
+const TooltipSwitch: React.FC<Props> = ({ tooltip, label, value, toggle, disabled = false }) => {
   return (
     <div className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/30 transition-colors">
       <div className="flex items-center gap-1.5">
@@ -24,8 +25,9 @@ const TooltipSwitch: React.FC<Props> = ({ tooltip, label, value, toggle }) => {
       <button
         role="switch"
         aria-checked={value}
-        onClick={toggle}
-        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        disabled={disabled}
+        onClick={disabled ? undefined : toggle}
+        className={`relative inline-flex h-5 w-9 shrink-0 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           value ? 'bg-primary' : 'bg-muted'
         }`}
       >

@@ -1,4 +1,4 @@
-import { Pencil, Copy, MapPin, Trash2, Check, X } from 'lucide-react';
+import { Pencil, Copy, Navigation, Trash2, Check, X } from 'lucide-react';
 import { DoorColumn } from '../../../store/doors';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../../store';
@@ -9,13 +9,13 @@ import { CellContext } from '@tanstack/react-table';
 import { useVisibility } from '../../../store/visibility';
 import { useState } from 'react';
 
-const ActionsMenu: React.FC<{ data: CellContext<DoorColumn, unknown> }> = ({ data }) => {
+const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
   const navigate = useNavigate();
   const setClipboard = useClipboard((state) => state.setClipboard);
   const setVisible = useVisibility((state) => state.setVisible);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const doorId = data.row.getValue('id');
+  const doorId = door.id;
 
   return (
     <>
@@ -23,7 +23,7 @@ const ActionsMenu: React.FC<{ data: CellContext<DoorColumn, unknown> }> = ({ dat
         <button
           title="Editar porta"
           onClick={() => {
-            useStore.setState(convertData(data.row.original), true);
+            useStore.setState(convertData(door), true);
             navigate('/settings/general');
           }}
           className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
@@ -32,12 +32,26 @@ const ActionsMenu: React.FC<{ data: CellContext<DoorColumn, unknown> }> = ({ dat
         </button>
 
         <button
-          title="Copiar configurações"
+          title="Duplicar Porta"
           onClick={() => {
-            setClipboard(convertData(data.row.original));
-            fetchNui('notify', 'Configurações copiadas');
+            const cloneData = JSON.parse(JSON.stringify(door));
+            delete cloneData.id;
+            
+            const name = cloneData.name || "Porta";
+            const match = name.match(/^(.*?)\s*(\d+)$/);
+            if (match) {
+              const baseName = match[1];
+              const num = parseInt(match[2], 10);
+              cloneData.name = `${baseName}${baseName ? " " : ""}${num + 1}`;
+            } else {
+              cloneData.name = `${name} 2`;
+            }
+            
+            cloneData.reselect = true;
+            setVisible(false);
+            fetchNui('createDoor', cloneData);
           }}
-          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
         >
           <Copy size={16} />
         </button>
@@ -48,9 +62,9 @@ const ActionsMenu: React.FC<{ data: CellContext<DoorColumn, unknown> }> = ({ dat
             setVisible(false);
             fetchNui('teleportToDoor', doorId);
           }}
-          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
         >
-          <MapPin size={16} />
+          <Navigation size={16} />
         </button>
 
         <button
