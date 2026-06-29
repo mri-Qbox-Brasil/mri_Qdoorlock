@@ -635,6 +635,31 @@ function openUi(id)
 	})
 end
 
+RegisterNUICallback('requestData', function(_, cb)
+	NuiHasLoaded = true
+	local soundFiles = lib.callback.await('ox_doorlock:getSounds', false)
+	cb({
+		doors = doors,
+		doorGroups = doorGroups,
+		sounds = soundFiles
+	})
+
+	SendNuiMessage(json.encode({
+		action = 'updateDoorData',
+		data = doors
+	}, { with_hole = false }))
+	Wait(10)
+	SendNuiMessage(json.encode({
+		action = 'updateDoorGroups',
+		data = doorGroups
+	}, { with_hole = false }))
+	Wait(10)
+	SendNUIMessage({
+		action = 'setSoundFiles',
+		data = soundFiles
+	})
+end)
+
 RegisterNetEvent('ox_doorlock:triggeredCommand', function(closest)
 	openUi(closest and ClosestDoor?.id or nil)
 end)

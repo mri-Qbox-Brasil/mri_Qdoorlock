@@ -100,6 +100,22 @@ const App: React.FC = () => {
     }
   }, [isPlugin]);
 
+  useEffect(() => {
+    fetchNui('requestData').then((data: any) => {
+      if (data && data.doors) {
+        setDoors(Object.values(data.doors));
+      }
+      if (data && data.doorGroups) {
+        setDoorGroups(data.doorGroups);
+      }
+      if (data && data.sounds) {
+        setSounds(data.sounds);
+      }
+    }).catch((err) => {
+      console.error('Failed to request data:', err);
+    });
+  }, [setDoors, setDoorGroups, setSounds]);
+
   useNuiEvent('confirmDeleteDoor', (id: number) => {
     setDeleteDoorId(id);
   });
