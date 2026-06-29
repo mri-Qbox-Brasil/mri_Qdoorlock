@@ -31,6 +31,7 @@ type MriSelectBase = {
   portal?: boolean
   size?: "default" | "sm"
   createLabelPrefix?: string
+  searchable?: boolean
 }
 
 type MriSelectSingleProps = MriSelectBase & {
@@ -66,6 +67,7 @@ function MriSelectSingle({
   clearable = false,
   creatable = false,
   createLabelPrefix = "Create",
+  searchable = false,
 }: MriSelectSingleProps) {
   const [open, setOpen] = useState(false)
   const [searchValue, setSearchValue] = useState("")
@@ -111,12 +113,14 @@ function MriSelectSingle({
       </MriPopoverTrigger>
       <MriPopoverContent portal={portal} className="w-[--radix-popover-trigger-width] p-0 border-border bg-popover z-[100]">
         <MriCommand className="bg-transparent text-popover-foreground">
-          <MriCommandInput
-            placeholder={searchPlaceholder}
-            className="h-9"
-            value={searchValue}
-            onValueChange={setSearchValue}
-          />
+          {searchable && (
+            <MriCommandInput
+              placeholder={searchPlaceholder}
+              className="h-9"
+              value={searchValue}
+              onValueChange={setSearchValue}
+            />
+          )}
           <MriCommandEmpty>
             {showCreateOption ? (
               <div
@@ -191,6 +195,7 @@ function MriSelectMultiple({
   error,
   portal = true,
   maxVisibleValues = 3,
+  searchable = false,
 }: MriSelectMultipleProps) {
   const [open, setOpen] = useState(false)
 
@@ -261,7 +266,9 @@ function MriSelectMultiple({
       </MriPopoverTrigger>
       <MriPopoverContent portal={portal} className="w-[--radix-popover-trigger-width] p-0 border-border bg-popover z-[100] shadow-2xl overflow-hidden rounded-xl">
         <MriCommand className="bg-transparent text-popover-foreground">
-          <MriCommandInput placeholder={searchPlaceholder} className="h-10 border-none focus:ring-0 bg-transparent" />
+          {searchable && (
+            <MriCommandInput placeholder={searchPlaceholder} className="h-10 border-none focus:ring-0 bg-transparent" />
+          )}
           <MriCommandEmpty className="py-6 text-sm text-center text-muted-foreground">{emptyMessage}</MriCommandEmpty>
           <MriCommandList
             className="max-h-64 overflow-auto p-1.5 space-y-0.5 custom-scrollbar"
