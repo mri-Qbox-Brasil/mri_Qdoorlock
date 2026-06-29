@@ -18,7 +18,11 @@ import PasscodePrompt from './components/PasscodePrompt';
 import { usePluginGuest } from './plugin/usePluginGuest';
 import { hexToHsl } from './utils/color';
 
+import './i18n';
+import { useTranslation } from 'react-i18next';
+
 const App: React.FC = () => {
+  const { i18n } = useTranslation();
   const setSounds = useSetters((setter) => setter.setSounds);
   const [visible, setVisible] = useVisibility((state) => [state.visible, state.setVisible]);
   const doors = useDoors((state) => state.doors);
@@ -100,8 +104,19 @@ const App: React.FC = () => {
     }
   }, [isPlugin]);
 
+  const [localeLoaded, setLocaleLoaded] = useState(false);
+
   useEffect(() => {
     fetchNui('requestData').then((data: any) => {
+      if (data && data.locale && data.locales) {
+        i18n.addResourceBundle(data.locale, 'translation', data.locales, true, true);
+        i18n.changeLanguage(data.locale).then(() => {
+          setLocaleLoaded(true);
+        });
+      } else {
+        setLocaleLoaded(true);
+      }
+
       if (data && data.doors) {
         setDoors(Object.values(data.doors));
       }
@@ -112,10 +127,11 @@ const App: React.FC = () => {
         setSounds(data.sounds);
       }
       if (data && data.debugGroupId !== undefined) {
-        useDebug.setState({ debugGroupId: data.debugGroupId });
+        useDebug.setState({ debugGroupId: data.debugGroupId === false ? null : Number(data.debugGroupId) });
       }
     }).catch((err) => {
       console.error('Failed to request data:', err);
+      setLocaleLoaded(true);
     });
   }, [setDoors, setDoorGroups, setSounds]);
 
@@ -188,6 +204,8 @@ const App: React.FC = () => {
     }
   });
 
+  if (!localeLoaded) return null;
+
   return (
     <div className={isPlugin ? "w-full h-full flex justify-center items-center" : "w-full h-full flex justify-center items-center p-8"}>
       <ThemeSync />
@@ -200,6 +218,7 @@ const App: React.FC = () => {
         style={isPlugin ? { isolation: 'isolate' } : { width: 950, height: 650, isolation: 'isolate', WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
       >
         <div className={isPlugin ? "w-full h-full bg-background text-foreground flex flex-col relative overflow-hidden" : "w-full h-full bg-background border border-border/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col relative"}>
+
           <Routes>
             <Route path="/" element={<Doors />} />
             <Route path="/settings/*" element={<Settings />} />

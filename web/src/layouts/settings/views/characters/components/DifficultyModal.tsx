@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSetters, useStore } from '../../../../../store';
 import { MriSelect } from '../../../../../components/molecules/MriSelect';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   selectData: { value: string; label: string }[];
@@ -9,6 +10,7 @@ interface Props {
 }
 
 const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
+  const { t } = useTranslation();
   const lockpickDifficulty = useStore((store) => store.lockpickDifficulty);
   const setLockpickDifficulty = useSetters((setter) => setter.setLockpickDifficulty);
   const lockpickData = lockpickDifficulty[modal.index];
@@ -21,8 +23,8 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: typeof errors = {};
-    if (select === 'custom' && !areaSize) newErrors.areaSize = 'Obrigatório';
-    if (select === 'custom' && !speedMultiplier) newErrors.speedMultiplier = 'Obrigatório';
+    if (select === 'custom' && !areaSize) newErrors.areaSize = t('ui_error_required');
+    if (select === 'custom' && !speedMultiplier) newErrors.speedMultiplier = t('ui_error_required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
 
     setModal((m) => ({ ...m, opened: false }));
@@ -39,7 +41,7 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Dificuldade</label>
+        <label className="text-xs font-medium text-muted-foreground">{t('ui_lockpick_difficulty_label')}</label>
         <MriSelect
           options={selectData}
           value={select}
@@ -48,7 +50,7 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Tamanho da área (graus)</label>
+        <label className="text-xs font-medium text-muted-foreground">{t('ui_lockpick_area_label')}</label>
         <input
           type="number"
           value={areaSize}
@@ -61,7 +63,7 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
       </div>
 
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">Multiplicador de velocidade</label>
+        <label className="text-xs font-medium text-muted-foreground">{t('ui_lockpick_speed_label')}</label>
         <input
           type="number"
           value={speedMultiplier}
@@ -77,7 +79,7 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
         type="submit"
         className="w-full h-8 text-sm font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
       >
-        Confirmar
+        {t('ui_btn_confirm')}
       </button>
     </form>
   );

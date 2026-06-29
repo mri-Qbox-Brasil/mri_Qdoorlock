@@ -9,8 +9,10 @@ import { useDoorGroups } from '../../../store/doorGroups';
 import { useSelection } from '../../../store/selection';
 import { BulkActionBar } from './BulkActionBar';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const Header: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const setVisible = useVisibility((state) => state.setVisible);
   const doorsCount = useDoors((state) => state.doors.length);
@@ -33,15 +35,15 @@ const Header: React.FC = () => {
       ) : (
         <>
           <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-foreground tracking-wide">Portas</h1>
+            <h1 className="text-xl font-bold text-foreground tracking-wide">{t('ui_doors_title')}</h1>
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold bg-primary/20 text-primary uppercase tracking-wider">
                 <DoorClosed size={12} />
-                {doorsCount} {doorsCount === 1 ? 'Porta' : 'Portas'}
+                {doorsCount} {doorsCount === 1 ? t('ui_door_singular') : t('ui_door_plural')}
               </span>
               <span className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 uppercase tracking-wider">
                 <Folder size={12} />
-                {groupsCount} {groupsCount === 1 ? 'Grupo' : 'Grupos'}
+                {groupsCount} {groupsCount === 1 ? t('ui_group_singular') : t('ui_group_plural')}
               </span>
             </div>
           </div>
@@ -49,7 +51,7 @@ const Header: React.FC = () => {
       <div className="flex items-center gap-2">
         <Searchbar />
         <button
-          title="Criar novo grupo"
+          title={t('ui_create_group_tooltip')}
           onClick={() => {
             setShowCreateGroup(true);
           }}
@@ -58,7 +60,7 @@ const Header: React.FC = () => {
           <FolderPlus size={16} />
         </button>
         <button
-          title="Criar nova porta"
+          title={t('ui_create_door_tooltip')}
           onClick={() => {
             useStore.setState(defaultState, true);
             navigate('/settings/general');
@@ -68,7 +70,7 @@ const Header: React.FC = () => {
           <Plus size={16} />
         </button>
         <button
-          title="Fechar"
+          title={t('ui_close_tooltip')}
           onClick={() => {
             setVisible(false);
             fetchNui('exit');
@@ -88,17 +90,17 @@ const Header: React.FC = () => {
             onClick={() => { setShowCreateGroup(false); setGroupName(''); }} 
           />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[400px] bg-card border border-border/60 rounded-2xl shadow-2xl p-6">
-            <h3 className="text-xl font-bold text-foreground mb-4">Criar Grupo de Portas</h3>
+            <h3 className="text-xl font-bold text-foreground mb-4">{t('ui_create_group_modal_title')}</h3>
             
             <div className="mb-6">
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Nome do Grupo <span className="text-destructive">*</span>
+                {t('ui_group_name_label')} <span className="text-destructive">*</span>
               </label>
               <input
                 type="text"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Ex: Prisão Principal"
+                placeholder={t('ui_group_name_placeholder')}
                 className="w-full bg-background border border-border/50 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                 autoFocus
                 onKeyDown={(e) => {
@@ -116,14 +118,14 @@ const Header: React.FC = () => {
                 className="flex-1 py-3 px-4 text-sm font-semibold rounded-xl bg-secondary/80 text-secondary-foreground hover:bg-secondary transition-colors"
                 onClick={() => { setShowCreateGroup(false); setGroupName(''); }}
               >
-                CANCELAR
+                {t('ui_btn_cancel')}
               </button>
               <button
                 className="flex-1 py-3 px-4 text-sm font-semibold rounded-xl bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition-colors shadow-[0_0_15px_rgba(var(--primary),0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handleCreateGroup}
                 disabled={!groupName.trim()}
               >
-                CONFIRMAR
+                {t('ui_btn_confirm')}
               </button>
             </div>
           </div>

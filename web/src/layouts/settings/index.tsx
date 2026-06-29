@@ -9,22 +9,24 @@ import Submit from './Submit';
 import { useStore } from '../../store';
 import Lockpick from './views/lockpick';
 import { cn } from '@/lib/utils';
-
-const tabs = [
-  { value: 'back', label: 'Portas', icon: ArrowLeft, isBack: true },
-  { value: 'general', label: 'Geral', icon: SettingsIcon },
-  { value: 'characters', label: 'Personagens', icon: Users },
-  { value: 'groups', label: 'Grupos', icon: Briefcase },
-  { value: 'items', label: 'Itens', icon: Package },
-  { value: 'lockpick', label: 'Lockpick', icon: Lock, requiresLockpick: true },
-  { value: 'sound', label: 'Som', icon: Volume2 },
-];
+import { useTranslation } from 'react-i18next';
 
 const Settings: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const lockpick = useStore((state) => state.lockpick);
   const activeTab = location.pathname.substring(10); // remove '/settings/'
+
+  const tabs = [
+    { value: 'back', label: t('ui_nav_doors'), icon: ArrowLeft, isBack: true },
+    { value: 'general', label: t('ui_nav_general'), icon: SettingsIcon },
+    { value: 'characters', label: t('ui_nav_characters'), icon: Users },
+    { value: 'groups', label: t('ui_nav_groups'), icon: Briefcase },
+    { value: 'items', label: t('ui_nav_items'), icon: Package },
+    { value: 'lockpick', label: t('ui_nav_lockpick'), icon: Lock, requiresLockpick: true },
+    { value: 'sound', label: t('ui_nav_sound'), icon: Volume2 },
+  ];
 
   return (
     <div className="flex h-full">

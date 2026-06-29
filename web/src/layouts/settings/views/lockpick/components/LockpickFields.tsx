@@ -3,18 +3,20 @@ import { Trash2, Settings } from 'lucide-react';
 import { useSetters, useStore } from '../../../../../store';
 import DifficultyModal from '../../characters/components/DifficultyModal';
 import { MriSelect } from '../../../../../components/molecules/MriSelect';
-
-const selectData: { label: string; value: string }[] = [
-  { label: 'Fácil', value: 'easy' },
-  { label: 'Médio', value: 'medium' },
-  { label: 'Difícil', value: 'hard' },
-  { label: 'Personalizado', value: 'custom' },
-];
+import { useTranslation } from 'react-i18next';
 
 const LockpickFields: React.FC = () => {
+  const { t } = useTranslation();
   const lockpickFields = useStore((state) => state.lockpickDifficulty);
   const setLockpickFields = useSetters((setter) => setter.setLockpickDifficulty);
   const [modal, setModal] = useState<{ opened: boolean; index: number }>({ opened: false, index: 0 });
+
+  const selectData: { label: string; value: string }[] = [
+    { label: t('ui_lockpick_easy'), value: 'easy' },
+    { label: t('ui_lockpick_medium'), value: 'medium' },
+    { label: t('ui_lockpick_hard'), value: 'hard' },
+    { label: t('ui_lockpick_custom'), value: 'custom' },
+  ];
 
   const handleRowDelete = (index: number) => {
     setLockpickFields((prevState) => prevState.filter((_obj, indx) => indx !== index));
@@ -32,14 +34,14 @@ const LockpickFields: React.FC = () => {
             className="flex-1"
           />
           <button
-            title="Editar linha"
+            title={t('ui_edit_row_tooltip')}
             onClick={() => setModal({ opened: true, index })}
             className="flex items-center justify-center w-8 h-8 rounded-md text-primary hover:bg-primary/10 transition-colors shrink-0"
           >
             <Settings size={15} />
           </button>
           <button
-            title="Deletar linha"
+            title={t('ui_delete_row_tooltip')}
             onClick={() => handleRowDelete(index)}
             className="flex items-center justify-center w-8 h-8 rounded-md text-destructive hover:bg-destructive/10 transition-colors shrink-0"
           >
@@ -52,7 +54,7 @@ const LockpickFields: React.FC = () => {
         <>
           <div className="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm" onClick={() => setModal({ ...modal, opened: false })} />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-64 bg-card border border-border rounded-xl shadow-2xl p-4">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Dificuldade da Lockpick</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">{t('ui_lockpick_modal_title')}</h3>
             <DifficultyModal selectData={selectData} setModal={setModal} modal={modal} />
           </div>
         </>

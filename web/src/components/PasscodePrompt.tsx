@@ -3,8 +3,10 @@ import { Lock, Eye, EyeOff } from 'lucide-react';
 import { fetchNui } from '../utils/fetchNui';
 import { useNuiEvent } from '../hooks/useNuiEvent';
 import NumericKeypad from './NumericKeypad';
+import { useTranslation } from 'react-i18next';
 
 const PasscodePrompt: React.FC = () => {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [passcodeType, setPasscodeType] = useState('text');
   const [passcode, setPasscode] = useState('');
@@ -76,16 +78,16 @@ const PasscodePrompt: React.FC = () => {
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
             <Lock size={20} />
           </div>
-          <h3 className="text-lg font-semibold text-foreground">Fechadura</h3>
+          <h3 className="text-lg font-semibold text-foreground">{t('ui_passcode_prompt_title')}</h3>
         </div>
         
         <p className="text-sm text-muted-foreground mb-4">
-          Esta porta requer uma senha para ser acessada.
+          {t('ui_passcode_prompt_desc')}
         </p>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-6">
-            <label className="block text-xs font-medium text-foreground mb-1">Senha</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t('ui_passcode_label')}</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Lock size={14} className="text-muted-foreground" />
@@ -94,7 +96,7 @@ const PasscodePrompt: React.FC = () => {
                 ref={inputRef}
                 type={showPassword ? 'text' : 'password'}
                 className="w-full pl-9 pr-10 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-muted-foreground/50"
-                placeholder="Digite a senha..."
+                placeholder={t('ui_passcode_placeholder')}
                 value={passcode}
                 onChange={(e) => setPasscode(e.target.value)}
               />
@@ -115,13 +117,13 @@ const PasscodePrompt: React.FC = () => {
               className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
               onClick={handleCancel}
             >
-              Cancelar
+              {t('ui_btn_cancel')}
             </button>
             <button
               type="submit"
               className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
             >
-              Confirmar
+              {t('ui_btn_confirm')}
             </button>
           </div>
         </form>

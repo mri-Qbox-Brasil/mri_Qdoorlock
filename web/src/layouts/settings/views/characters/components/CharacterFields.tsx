@@ -1,7 +1,9 @@
 import { Trash2 } from 'lucide-react';
 import { useStore, useSetters } from '../../../../../store';
+import { useTranslation } from 'react-i18next';
 
 const CharacterFields: React.FC = () => {
+  const { t } = useTranslation();
   const characters = useStore((state) => state.characters);
   const setCharacters = useSetters((setter) => setter.setCharacters);
 
@@ -24,7 +26,7 @@ const CharacterFields: React.FC = () => {
             onChange={(e) => handleChange(e.target.value, index)}
           />
           <button
-            title="Deletar linha"
+            title={t('ui_delete_row_tooltip')}
             onClick={() => handleRowDelete(index)}
             className="flex items-center justify-center w-8 h-8 rounded-md text-destructive hover:bg-destructive/10 transition-colors shrink-0"
           >
