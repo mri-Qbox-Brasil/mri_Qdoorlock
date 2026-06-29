@@ -599,6 +599,206 @@ RegisterNetEvent('ox_doorlock:updateGroup', function(id, data)
 	end
 end)
 
+local rayEntity = 0
+Citizen.CreateThread(function()
+	while true do
+		if debugGroupId then
+			local hit, ent = lib.raycast.cam(1|16, PlayerPedId(), 80.0)
+			rayEntity = hit and ent or 0
+			Wait(50)
+		else
+			Wait(1000)
+		end
+	end
+end)
+
+Citizen.CreateThread(function()
+	while true do
+		local sleep = 1000
+		if debugGroupId then
+			sleep = 0
+			local playerCoords = GetEntityCoords(cache.ped)
+			local currentEntities = {}
+			
+			local targetedDoorId = nil
+			local closestDist = 2.5
+			
+			-- Pass 1: Find targeted door and outline entities
+			for _, door in pairs(doors) do
+				if door.doorGroupId == debugGroupId and door.coords then
+					local dist = #(playerCoords - door.coords)
+					local isAimingAtDoor = false
+					
+					if door.doors then
+						for i = 1, 2 do
+							local d = door.doors[i]
+							if d.coords then
+								local ent = GetClosestObjectOfType(d.coords.x, d.coords.y, d.coords.z, 2.0, d.model or d.hash, false, false, false)
+								if ent > 0 then
+									currentEntities[ent] = true
+									if ent == rayEntity then isAimingAtDoor = true end
+									if not outlinedEntities[ent] then
+										SetEntityDrawOutline(ent, true)
+										outlinedEntities[ent] = true
+									end
+								end
+							end
+						end
+					else
+						local ent = GetClosestObjectOfType(door.coords.x, door.coords.y, door.coords.z, 2.0, door.model or door.hash, false, false, false)
+						if ent > 0 then
+							currentEntities[ent] = true
+							if ent == rayEntity then isAimingAtDoor = true end
+							if not outlinedEntities[ent] then
+								SetEntityDrawOutline(ent, true)
+								outlinedEntities[ent] = true
+							end
+						end
+					end
+					
+					if isAimingAtDoor and dist < 80.0 then
+						targetedDoorId = door.id
+						closestDist = -1
+					elseif closestDist > 0 and dist < closestDist then
+						closestDist = dist
+						targetedDoorId = door.id
+					end
+				end
+			end
+			
+			-- Pass 2: Draw text and handle interaction
+			for _, door in pairs(doors) do
+				if door.doorGroupId == debugGroupId and door.coords then
+					local dist = #(playerCoords - door.coords)
+					if dist < 100.0 then
+						local text = ("[%s] %s"):format(door.id, door.name)
+						
+						if door.id == targetedDoorId and not isAddingDoorlock then
+							text = text .. "\n~g~[ENTER]~w~ Editar | ~b~[G]~w~ Duplicar | ~r~[BACKSPACE]~w~ Deletar"
+							if IsControlJustPressed(0, 191) then
+								openUi(door.id)
+							elseif IsControlJustPressed(0, 47) then
+								local cloneData = json.decode(json.encode(door))
+								cloneData.id = nil
+								
+								local baseName, numStr = string.match(door.name or "Porta", "^(.-)%s*(%d+)$")
+								if baseName then
+									cloneData.name = baseName .. (baseName == "" and "" or " ") .. tostring(tonumber(numStr) + 1)
+								else
+									cloneData.name = (door.name or "Porta") .. " 2"
+								end
+								
+								cloneData.reselect = true
+								
+								CreateThread(function()
+									handleCreateDoor(cloneData)
+								end)
+							elseif IsControlJustPressed(0, 194) then
+								SetNuiFocus(true, true)
+								SetTimecycleModifier('hud_def_blur')
+								SendNUIMessage({
+									action = 'confirmDeleteDoor',
+									data = door.id
+								})
+							end
+						end
+						DrawText3D(door.coords.x, door.coords.y, door.coords.z + 0.5, text)
+					end
+				end
+			end
+			
+			for ent, _ in pairs(outlinedEntities) do
+				if not currentEntities[ent] then
+					if DoesEntityExist(ent) then
+						SetEntityDrawOutline(ent, false)
+					end
+					outlinedEntities[ent] = nil
+				end
+			end
+		end
+		Wait(sleep)
+	end
+end)
+
+RegisterNUICallback('exit', function(_, cb)
+	cb(1)
+	SetNuiFocus(false, false)
+	ClearTimecycleModifier()
+end)
+
+RegisterNUICallback('createGroup', function(data, cb)
+	cb(1)
+	if not data or not data.name or type(data.name) ~= 'string' then return end
+	local coords = GetEntityCoords(cache.ped)
+	TriggerServerEvent('ox_doorlock:editGroup', false, {
+		name = data.name,
+		coords = coords
+	})
+end)
+
+RegisterNUICallback('deleteGroup', function(id, cb)
+	cb(1)
+	local groupId = tonumber(id) or id
+	TriggerServerEvent('ox_doorlock:editGroup', groupId)
+end)
+
+RegisterNUICallback('moveDoorToGroup', function(data, cb)
+	cb(1)
+	local doorId = tonumber(data.doorId) or data.doorId
+	local door = doors[doorId]
+	if door then
+		local newDoorData = {}
+		for k, v in pairs(door) do newDoorData[k] = v end
+		newDoorData.doorGroupId = data.groupId
+		TriggerServerEvent('ox_doorlock:editDoorlock', data.doorId, newDoorData)
+	end
+end)
+
+RegisterNUICallback('moveDoorsToGroup', function(data, cb)
+	cb(1)
+	if type(data.doorIds) ~= 'table' then return end
+	
+	Citizen.CreateThread(function()
+		for _, doorId in ipairs(data.doorIds) do
+			local id = tonumber(doorId) or doorId
+			local door = doors[id]
+			if door then
+				local newDoorData = {}
+				for k, v in pairs(door) do newDoorData[k] = v end
+				newDoorData.doorGroupId = data.groupId
+				TriggerServerEvent('ox_doorlock:editDoorlock', doorId, newDoorData)
+				Wait(150)
+			end
+		end
+	end)
+end)
+
+RegisterNetEvent('ox_doorlock:updateGroup', function(id, data)
+	if data then
+		if data.coords then
+			local streetHash, crossingHash = GetStreetNameAtCoord(data.coords.x, data.coords.y, data.coords.z)
+			local streetName = GetStreetNameFromHashKey(streetHash)
+			if crossingHash ~= 0 then
+				streetName = streetName .. " - " .. GetStreetNameFromHashKey(crossingHash)
+			end
+			data.streetName = streetName
+		end
+		doorGroups[data.id] = data
+	else
+		doorGroups[id] = nil
+	end
+
+	if NuiHasLoaded then
+		SendNuiMessage(json.encode({
+			action = 'updateDoorGroups',
+			data = {
+				id = data and data.id or id,
+				data = data
+			}
+		}, { with_hole = false }))
+	end
+end)
+
 function openUi(id)
 	if source == '' or isAddingDoorlock then return end
 
@@ -638,11 +838,36 @@ end
 RegisterNUICallback('requestData', function(_, cb)
 	NuiHasLoaded = true
 	local soundFiles = lib.callback.await('ox_doorlock:getSounds', false)
+	
+	local localeStr = string.lower(GetConvar('ox:locale', 'pt'))
+	local localeData = LoadResourceFile(GetCurrentResourceName(), 'locales/' .. localeStr .. '.json')
+	if not localeData then
+		localeStr = 'en'
+		localeData = LoadResourceFile(GetCurrentResourceName(), 'locales/en.json')
+	end
+	
+	local translations = {}
+	if localeData then
+		-- Strip BOM if present
+		if string.sub(localeData, 1, 3) == "\239\187\191" then
+			localeData = string.sub(localeData, 4)
+		end
+		local success, result = pcall(json.decode, localeData)
+		if success and type(result) == 'table' then
+			translations = result
+		else
+			print('^1[mri_Qdoorlock] Error parsing locale file: ' .. localeStr .. '.json^0')
+			print('Error details: ' .. tostring(result))
+		end
+	end
+
 	cb({
 		doors = doors,
 		doorGroups = doorGroups,
 		sounds = soundFiles,
-		debugGroupId = debugGroupId
+		debugGroupId = debugGroupId,
+		locale = localeStr,
+		locales = translations
 	})
 
 	SendNuiMessage(json.encode({
