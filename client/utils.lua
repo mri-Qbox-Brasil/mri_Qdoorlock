@@ -110,9 +110,6 @@ RegisterNUICallback('notify', function(data, cb)
 end)
 
 local function handleCreateDoor(data)
-	SetNuiFocus(false, false)
-	ClearTimecycleModifier()
-
 	data.state = (data.state == true or data.state == 1) and 1 or 0
 
 	if data.items and not next(data.items) then
@@ -132,6 +129,8 @@ local function handleCreateDoor(data)
 	end
 
 	if not data.id or data.reselect == true then
+		SetNuiFocus(false, false)
+		ClearTimecycleModifier()
 		isAddingDoorlock = true
 		local doorCount = data.doors and 2 or 1
 		local lastEntity = 0
@@ -255,17 +254,24 @@ local function handleCreateDoor(data)
 			data.heading = tempData[1].heading
 		end
 	else
-		if data.doors then
+		if data.doors and type(data.doors) == 'table' then
 			for i = 1, 2 do
-				local coords = data.doors[i].coords
-				data.doors[i].coords = vector3(coords.x, coords.y, coords.z)
-				data.doors[i].entity = nil
+				if data.doors[i] then
+					local coords = data.doors[i].coords
+					if coords and type(coords) == 'table' and coords.x then
+						data.doors[i].coords = vector3(coords.x, coords.y, coords.z)
+					end
+					data.doors[i].entity = nil
+				end
 			end
 		else
+			data.doors = nil
 			data.entity = nil
 		end
 
-		data.coords = vector3(data.coords.x, data.coords.y, data.coords.z)
+		if data.coords and type(data.coords) == 'table' and data.coords.x then
+			data.coords = vector3(data.coords.x, data.coords.y, data.coords.z)
+		end
 		data.distance = nil
 		data.zone = nil
 	end
@@ -309,9 +315,6 @@ end)
 RegisterNUICallback('editDoorsBulk', function(data, cb)
 	cb(1)
 	if type(data.doorIds) ~= 'table' or type(data.changes) ~= 'table' then return end
-	
-	SetNuiFocus(false, false)
-	ClearTimecycleModifier()
 	
 	Citizen.CreateThread(function()
 		for _, doorId in ipairs(data.doorIds) do
