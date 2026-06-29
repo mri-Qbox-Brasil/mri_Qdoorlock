@@ -18,8 +18,12 @@ export async function fetchNui<T = any>(eventName: string, data?: any): Promise<
     body: JSON.stringify(data),
   };
 
-  const resourceName = (window as any).GetParentResourceName ? (window as any).GetParentResourceName() : 'nui-frame-app';
-
+  let resourceName = 'nui-frame-app';
+  if (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    resourceName = window.location.hostname.replace('cfx-nui-', '');
+  } else if ((window as any).GetParentResourceName) {
+    resourceName = (window as any).GetParentResourceName();
+  }
   const resp = await fetch(`https://${resourceName}/${eventName}`, options);
 
   try {

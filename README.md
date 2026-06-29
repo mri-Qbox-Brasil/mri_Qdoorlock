@@ -42,6 +42,15 @@ This will output the new UI files to the `web/build` folder, which the FiveM res
 - `/doorlock` - Opens the management UI (Requires ACE permission: `command.doorlock`).
 - From the UI, you can toggle debug mode, create groups, add new doors, set passcodes, and teleport to specific doors.
 
+## 🔌 Plugin API (mri_Qadmin Integration)
+
+**mri_Qdoorlock** is fully capable of operating as an embedded iframe plugin inside the **mri_Qadmin** panel.
+When accessed via the admin panel (embedded mode), it:
+- Automatically listens to `mri-plugin/init` and `mri-plugin/theme-changed` commands.
+- Dynamically parses the admin's Hex UI Colors and injects them internally as proper HSL Tailwind Variables (`--primary`, `--background`), syncing the theme in real-time.
+- Redirects NUI callback logic (like `fetchNui`) through the `BroadcastChannel` or ensures `window.location.hostname` is utilized properly to fix native iframe context loss.
+- Provides a completely seamless administrative experience without the need to type `/doorlock` separately.
+
 ## 👏 Credits
 
 This project was originally forked from and built upon the incredible work of the **[Overextended](https://github.com/overextended)** team, specifically their `ox_doorlock` resource. All foundational credit goes to them for creating such an optimized and robust system for the FiveM community.

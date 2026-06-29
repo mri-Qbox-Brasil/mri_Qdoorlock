@@ -1,5 +1,5 @@
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { fetchNui } from './utils/fetchNui';
 import { useNuiEvent } from './hooks/useNuiEvent';
@@ -15,6 +15,8 @@ import ThemeSync from './components/ThemeSync';
 import { useDoorGroups, DoorGroup } from './store/doorGroups';
 import { useDebug } from './store/debug';
 import PasscodePrompt from './components/PasscodePrompt';
+import { usePluginGuest } from './plugin/usePluginGuest';
+import { hexToHsl } from './utils/color';
 
 const App: React.FC = () => {
   const setSounds = useSetters((setter) => setter.setSounds);
@@ -26,6 +28,77 @@ const App: React.FC = () => {
   const toggleDebugGroup = useDebug((state) => state.toggleDebugGroup);
   const navigate = useNavigate();
   const [deleteDoorId, setDeleteDoorId] = useState<number | null>(null);
+
+  const isPlugin = window.location.search.includes('embedded=1');
+
+  const applyTheme = (data: { accentColor?: string, backgroundColor?: string }) => {
+    if (data.accentColor) {
+      const hsl = hexToHsl(data.accentColor);
+      if (hsl) {
+        const tokenValue = `${hsl.h} ${hsl.s}% ${hsl.l}%`;
+        const fgValue = hsl.l > 60 ? '240 10% 3.9%' : '210 40% 98%';
+        
+        let styleEl = document.getElementById('mri-plugin-theme-style');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          styleEl.id = 'mri-plugin-theme-style';
+          document.head.appendChild(styleEl);
+        }
+        
+        styleEl.innerHTML = `
+          .dark {
+            --primary: ${tokenValue} !important;
+            --primary-foreground: ${fgValue} !important;
+            --ring: ${tokenValue} !important;
+          }
+        `;
+      }
+    }
+    if (data.backgroundColor) {
+      const hslBg = hexToHsl(data.backgroundColor);
+      if (hslBg) {
+        document.documentElement.style.setProperty('--background', `${hslBg.h} ${hslBg.s}% ${hslBg.l}%`);
+      }
+    }
+  };
+
+  const sendToHost = usePluginGuest({
+    onInit: (data) => {
+      applyTheme(data);
+      setVisible(true);
+    },
+    onThemeChanged: (data) => {
+      applyTheme(data);
+    },
+  });
+
+  useEffect(() => {
+    const bc = new BroadcastChannel('mri_Qdoorlock_nui');
+
+    if (!isPlugin) {
+        const forwardToPlugin = (e: MessageEvent) => {
+            if (e.data && e.data.action) {
+                bc.postMessage(e.data);
+            }
+        };
+        window.addEventListener('message', forwardToPlugin);
+        return () => {
+            window.removeEventListener('message', forwardToPlugin);
+            bc.close();
+        };
+    } else {
+        const receiveFromNative = (e: MessageEvent) => {
+            if (e.data && e.data.action) {
+                window.dispatchEvent(new MessageEvent('message', { data: e.data }));
+            }
+        };
+        bc.addEventListener('message', receiveFromNative);
+        return () => {
+            bc.removeEventListener('message', receiveFromNative);
+            bc.close();
+        };
+    }
+  }, [isPlugin]);
 
   useNuiEvent('confirmDeleteDoor', (id: number) => {
     setDeleteDoorId(id);
@@ -91,19 +164,23 @@ const App: React.FC = () => {
 
   useExitListener(setVisible, () => {
     setDeleteDoorId(null);
+    if (isPlugin) {
+      sendToHost({ type: 'mri-plugin/request-close' });
+    }
   });
 
   return (
-    <div className="w-full h-full flex justify-center items-center p-8">
+    <div className={isPlugin ? "w-full h-full flex justify-center items-center" : "w-full h-full flex justify-center items-center p-8"}>
       <ThemeSync />
       <div
         className={`
           transition-all duration-300 ease-in-out
           ${visible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-95 pointer-events-none'}
+          ${isPlugin ? 'w-full h-full' : ''}
         `}
-        style={{ width: 950, height: 650 }}
+        style={isPlugin ? { isolation: 'isolate' } : { width: 950, height: 650, isolation: 'isolate', WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
       >
-        <div className="w-full h-full bg-background border border-border/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+        <div className={isPlugin ? "w-full h-full bg-background text-foreground flex flex-col relative overflow-hidden" : "w-full h-full bg-background border border-border/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col relative"}>
           <Routes>
             <Route path="/" element={<Doors />} />
             <Route path="/settings/*" element={<Settings />} />
