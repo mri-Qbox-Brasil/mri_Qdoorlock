@@ -61,6 +61,9 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
           onClick={() => {
             setVisible(false);
             fetchNui('teleportToDoor', doorId);
+            if (window.location.search.includes('embedded=1') && window.parent !== window) {
+              window.parent.postMessage({ type: 'mri-plugin/request-close' }, '*');
+            }
           }}
           className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
         >

@@ -69,6 +69,9 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
     if (isUngrouped || !group.coords) return;
     setVisible(false);
     fetchNui('teleportToGroup', group.id);
+    if (window.location.search.includes('embedded=1') && window.parent !== window) {
+      window.parent.postMessage({ type: 'mri-plugin/request-close' }, '*');
+    }
   };
 
   const handleToggleDebug = (e: React.MouseEvent) => {
