@@ -111,6 +111,9 @@ const App: React.FC = () => {
       if (data && data.sounds) {
         setSounds(data.sounds);
       }
+      if (data && data.debugGroupId !== undefined) {
+        useDebug.setState({ debugGroupId: data.debugGroupId });
+      }
     }).catch((err) => {
       console.error('Failed to request data:', err);
     });

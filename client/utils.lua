@@ -641,7 +641,8 @@ RegisterNUICallback('requestData', function(_, cb)
 	cb({
 		doors = doors,
 		doorGroups = doorGroups,
-		sounds = soundFiles
+		sounds = soundFiles,
+		debugGroupId = debugGroupId
 	})
 
 	SendNuiMessage(json.encode({
