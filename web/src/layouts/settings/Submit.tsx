@@ -90,7 +90,11 @@ const Submit: React.FC = () => {
       data.lockpickDifficulty = lockpickArr;
     }
 
-    setVisible(false);
+    const isEditing = data.id && !reselect;
+    
+    if (!isEditing) {
+      setVisible(false);
+    }
     
     if (data.isBulkEdit) {
       fetchNui('editDoorsBulk', {
@@ -98,8 +102,14 @@ const Submit: React.FC = () => {
         changes: data
       });
       clearSelection();
+      navigate('/');
+      setTimeout(() => window.dispatchEvent(new CustomEvent('showSuccessToast', { detail: 'ui_save_success_toast' })), 100);
     } else {
       fetchNui('createDoor', data);
+      if (isEditing) {
+        navigate('/');
+        setTimeout(() => window.dispatchEvent(new CustomEvent('showSuccessToast', { detail: 'ui_save_success_toast' })), 100);
+      }
     }
 
     if ((!useStore.getState().id || reselect) && window.location.search.includes('embedded=1') && window.parent !== window) {
