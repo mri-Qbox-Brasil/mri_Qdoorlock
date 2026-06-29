@@ -110,7 +110,6 @@ RegisterNUICallback('notify', function(data, cb)
 end)
 
 local function handleCreateDoor(data)
-	table.wipe(tempData)
 	data.state = (data.state == true or data.state == 1) and 1 or 0
 
 	if data.items and not next(data.items) then
@@ -133,7 +132,7 @@ local function handleCreateDoor(data)
 		SetNuiFocus(false, false)
 		ClearTimecycleModifier()
 		isAddingDoorlock = true
-		local doorCount = (data.doors and type(data.doors) == 'table' and data.doors[1]) and 2 or 1
+		local doorCount = data.doors and 2 or 1
 		local lastEntity = 0
 
 		lib.showTextUI(locale('add_door_textui'))
@@ -209,7 +208,7 @@ local function handleCreateDoor(data)
 					100, false, false, 0, true, false, false, false)
 			end
 
-			if hit and entity > 0 and GetEntityType(entity) ~= 0 and GetEntityType(entity) ~= 1 and GetEntityType(entity) ~= 2 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id == nil and -1 or data.id) then
+			if hit and entity > 0 and GetEntityType(entity) ~= 0 and GetEntityType(entity) ~= 1 and GetEntityType(entity) ~= 2 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id) then
 				if changedEntity then
 					SetEntityDrawOutline(entity, true)
 				end
@@ -603,139 +602,7 @@ RegisterNetEvent('ox_doorlock:updateGroup', function(id, data)
 	end
 end)
 
-local rayEntity = 0
-Citizen.CreateThread(function()
-	while true do
-		if debugGroupId then
-			local hit, ent = lib.raycast.cam(1|16, PlayerPedId(), 80.0)
-			rayEntity = hit and ent or 0
-			Wait(50)
-		else
-			Wait(1000)
-		end
-	end
-end)
 
-Citizen.CreateThread(function()
-	while true do
-		local sleep = 1000
-		if debugGroupId then
-			sleep = 0
-			local playerCoords = GetEntityCoords(cache.ped)
-			local currentEntities = {}
-			
-			local targetedDoorId = nil
-			local closestDist = 2.5
-			
-			-- Pass 1: Find targeted door and outline entities
-			for _, door in pairs(doors) do
-				if door.doorGroupId == debugGroupId and door.coords then
-					local dist = #(playerCoords - door.coords)
-					local isAimingAtDoor = false
-					
-					if door.doors then
-						for i = 1, 2 do
-							local d = door.doors[i]
-							if d.coords then
-								local ent = GetClosestObjectOfType(d.coords.x, d.coords.y, d.coords.z, 2.0, d.model or d.hash, false, false, false)
-								if ent > 0 then
-									currentEntities[ent] = true
-									if ent == rayEntity then isAimingAtDoor = true end
-									if not outlinedEntities[ent] then
-										SetEntityDrawOutline(ent, true)
-										outlinedEntities[ent] = true
-									end
-								end
-							end
-						end
-					else
-						local ent = GetClosestObjectOfType(door.coords.x, door.coords.y, door.coords.z, 2.0, door.model or door.hash, false, false, false)
-						if ent > 0 then
-							currentEntities[ent] = true
-							if ent == rayEntity then isAimingAtDoor = true end
-							if not outlinedEntities[ent] then
-								SetEntityDrawOutline(ent, true)
-								outlinedEntities[ent] = true
-							end
-						end
-					end
-					
-					if isAimingAtDoor and dist < 80.0 then
-						targetedDoorId = door.id
-						closestDist = -1
-					elseif closestDist > 0 and dist < closestDist then
-						closestDist = dist
-						targetedDoorId = door.id
-					end
-				end
-			end
-			
-			-- Pass 2: Draw text and handle interaction
-			for _, door in pairs(doors) do
-				if door.doorGroupId == debugGroupId and door.coords then
-					local dist = #(playerCoords - door.coords)
-					if dist < 100.0 then
-						local text = ("[%s] %s"):format(door.id, door.name)
-						
-						if door.id == targetedDoorId and not isAddingDoorlock then
-							text = text .. "\n~g~[ENTER]~w~ Editar | ~b~[G]~w~ Duplicar | ~r~[BACKSPACE]~w~ Deletar"
-							if IsControlJustPressed(0, 191) then
-								openUi(door.id)
-							elseif IsControlJustPressed(0, 47) then
-								local cloneData = json.decode(json.encode(door))
-								cloneData.id = nil
-								-- Strip stale entity/position data so selection loop starts fresh
-								cloneData.coords = nil
-								cloneData.heading = nil
-								cloneData.model = nil
-								if cloneData.doors then
-									-- Keep structure (so doorCount=2) but wipe stale position/entity refs
-									for i = 1, 2 do
-										if cloneData.doors[i] then
-											cloneData.doors[i].coords = nil
-											cloneData.doors[i].heading = nil
-											cloneData.doors[i].entity = nil
-										end
-									end
-								end
-								local baseName, numStr = string.match(door.name or "Porta", "^(.-)%s*(%d+)$")
-								if baseName then
-									cloneData.name = baseName .. (baseName == "" and "" or " ") .. tostring(tonumber(numStr) + 1)
-								else
-									cloneData.name = (door.name or "Porta") .. " 2"
-								end
-								
-								cloneData.reselect = true
-								
-								CreateThread(function()
-									handleCreateDoor(cloneData)
-								end)
-							elseif IsControlJustPressed(0, 194) then
-								SetNuiFocus(true, true)
-								SetTimecycleModifier('hud_def_blur')
-								SendNUIMessage({
-									action = 'confirmDeleteDoor',
-									data = door.id
-								})
-							end
-						end
-						DrawText3D(door.coords.x, door.coords.y, door.coords.z + 0.5, text)
-					end
-				end
-			end
-			
-			for ent, _ in pairs(outlinedEntities) do
-				if not currentEntities[ent] then
-					if DoesEntityExist(ent) then
-						SetEntityDrawOutline(ent, false)
-					end
-					outlinedEntities[ent] = nil
-				end
-			end
-		end
-		Wait(sleep)
-	end
-end)
 
 
 
