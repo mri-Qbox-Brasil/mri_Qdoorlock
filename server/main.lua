@@ -261,7 +261,7 @@ MySQL.ready(function()
 	local isFirstInstall = not tables or #tables == 0
 
 	if isFirstInstall then
-		print("^2[mri_Qdoorlock] Instalando tabelas do banco de dados pela primeira vez...^0")
+		print("^2[mri_Qdoorlock] Installing database tables for the first time...^0")
 	end
 
 	if sql then
@@ -273,7 +273,28 @@ MySQL.ready(function()
 	end
 
 	if isFirstInstall then
-		print("^2[mri_Qdoorlock] Instalação do banco de dados concluída com sucesso!^0")
+		print("^2[mri_Qdoorlock] Database installation completed successfully!^0")
+		
+		-- Integração / Migração Automática do ox_doorlock
+		local oxTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock'")
+		if oxTables and #oxTables > 0 then
+			print("^3[mri_Qdoorlock] ox_doorlock database detected! Starting automatic migration...^0")
+			
+			local oxGroupsTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock_groups'")
+			if oxGroupsTables and #oxGroupsTables > 0 then
+				MySQL.query.await([[
+					INSERT IGNORE INTO `mri_qdoorlock_groups` (`id`, `name`, `coords`)
+					SELECT `id`, `name`, `coords` FROM `ox_doorlock_groups`
+				]])
+			end
+
+			MySQL.query.await([[
+				INSERT IGNORE INTO `mri_qdoorlock` (`id`, `name`, `data`)
+				SELECT `id`, `name`, `data` FROM `ox_doorlock`
+			]])
+			
+			print("^2[mri_Qdoorlock] Migration completed! All doors and groups from ox_doorlock have been copied.^0")
+		end
 	end
 
 
@@ -461,7 +482,7 @@ local function registerPlugin()
         })
     end)
     if not ok or result == false then
-        print(('[mri_Qdoorlock] Falha ao registrar plugin no mri_Qadmin: %s'):format(tostring(result)))
+        print(('[mri_Qdoorlock] Failed to register plugin in mri_Qadmin: %s'):format(tostring(result)))
     end
 end
 
