@@ -1,4 +1,4 @@
-import { ClipboardCheck, Trash2, Save, MapPin } from 'lucide-react';
+import { ClipboardCheck, Trash2, Save, MapPin, PlusCircle } from 'lucide-react';
 import { useStore } from '../../store';
 import { fetchNui } from '../../utils/fetchNui';
 import { useClipboard } from '../../store/clipboard';
@@ -6,8 +6,10 @@ import { useVisibility } from '../../store/visibility';
 import { useSelection } from '../../store/selection';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const Submit: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const clipboard = useClipboard((state) => state.clipboard);
   const setVisible = useVisibility((state) => state.setVisible);
@@ -99,6 +101,10 @@ const Submit: React.FC = () => {
     } else {
       fetchNui('createDoor', data);
     }
+
+    if ((!useStore.getState().id || reselect) && window.location.search.includes('embedded=1') && window.parent !== window) {
+      window.parent.postMessage({ type: 'mri-plugin/request-close' }, '*');
+    }
   };
 
   const hasId = !!useStore.getState().id;
@@ -113,7 +119,7 @@ const Submit: React.FC = () => {
             className="w-full flex items-center justify-center gap-2 h-9 rounded-md border border-primary/50 text-primary hover:bg-primary/10 text-sm font-semibold transition-colors"
           >
             <MapPin size={15} />
-            Alterar Posição da Porta no Mapa
+            {t('ui_change_door_pos')}
           </button>
         )}
 
@@ -123,13 +129,13 @@ const Submit: React.FC = () => {
             disabled={hasValidationError as boolean}
             className="flex-1 flex items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save size={15} />
-            Salvar Porta
+            {hasId ? <Save size={15} /> : <PlusCircle size={15} />}
+            {hasId ? t('ui_save_door') : t('ui_create_door_btn')}
           </button>
 
           {/* Paste clipboard */}
           <button
-            title={!clipboard ? 'Nenhuma configuração copiada' : 'Aplicar configurações copiadas'}
+            title={!clipboard ? t('ui_clipboard_empty_tooltip') : t('ui_clipboard_apply_tooltip')}
             disabled={!clipboard}
             onClick={() => {
               if (!clipboard) return;
@@ -152,7 +158,7 @@ const Submit: React.FC = () => {
                 lockpickDifficulty: clipboard.lockpickDifficulty,
                 holdOpen: clipboard.holdOpen,
               }, true);
-              fetchNui('notify', 'Configurações aplicadas');
+              fetchNui('notify', t('ui_clipboard_applied_toast'));
             }}
             className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-muted-foreground hover:text-primary hover:border-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -161,7 +167,7 @@ const Submit: React.FC = () => {
 
           {/* Delete */}
           <button
-            title="Deletar porta"
+            title={t('ui_delete_door_tooltip')}
             disabled={!hasId}
             onClick={() => setConfirmDelete(true)}
             className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-muted-foreground hover:text-destructive hover:border-destructive disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -183,11 +189,11 @@ const Submit: React.FC = () => {
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
                 <MapPin size={20} />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Alterar Posição</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('ui_reselect_door_modal_title')}</h3>
             </div>
             
             <p className="text-sm text-muted-foreground mb-6">
-              Tem certeza que deseja reposicionar esta porta no mapa? Você precisará selecionar o objeto novamente.
+              {t('ui_reselect_door_modal_desc')}
             </p>
             
             <div className="flex justify-end gap-3">
@@ -195,7 +201,7 @@ const Submit: React.FC = () => {
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                 onClick={() => setConfirmReselect(false)}
               >
-                Cancelar
+                {t('ui_btn_cancel')}
               </button>
               <button
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
@@ -204,7 +210,7 @@ const Submit: React.FC = () => {
                   setConfirmReselect(false);
                 }}
               >
-                Confirmar
+                {t('ui_btn_confirm')}
               </button>
             </div>
           </div>
@@ -223,11 +229,11 @@ const Submit: React.FC = () => {
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
                 <Save size={20} />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Salvar Alterações</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('ui_save_door_modal_title')}</h3>
             </div>
             
             <p className="text-sm text-muted-foreground mb-6">
-              Tem certeza que deseja salvar as configurações desta porta?
+              {t('ui_save_door_modal_desc')}
             </p>
             
             <div className="flex justify-end gap-3">
@@ -235,7 +241,7 @@ const Submit: React.FC = () => {
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                 onClick={() => setConfirmSave(false)}
               >
-                Cancelar
+                {t('ui_btn_cancel')}
               </button>
               <button
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
@@ -244,7 +250,7 @@ const Submit: React.FC = () => {
                   setConfirmSave(false);
                 }}
               >
-                Salvar
+                {t('ui_btn_save')}
               </button>
             </div>
           </div>
@@ -263,11 +269,11 @@ const Submit: React.FC = () => {
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
                 <Trash2 size={20} />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Excluir Porta</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('ui_delete_door_modal_title')}</h3>
             </div>
             
             <p className="text-sm text-muted-foreground mb-6">
-              Tem certeza que deseja excluir esta porta? Esta ação não poderá ser desfeita.
+              {t('ui_delete_door_modal_desc')}
             </p>
             
             <div className="flex justify-end gap-3">
@@ -275,7 +281,7 @@ const Submit: React.FC = () => {
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                 onClick={() => setConfirmDelete(false)}
               >
-                Cancelar
+                {t('ui_btn_cancel')}
               </button>
               <button
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
@@ -285,7 +291,7 @@ const Submit: React.FC = () => {
                   setConfirmDelete(false);
                 }}
               >
-                Excluir
+                {t('ui_btn_delete')}
               </button>
             </div>
           </div>

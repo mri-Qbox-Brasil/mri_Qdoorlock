@@ -8,8 +8,10 @@ import { fetchNui } from '../../../utils/fetchNui';
 import { CellContext } from '@tanstack/react-table';
 import { useVisibility } from '../../../store/visibility';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const setClipboard = useClipboard((state) => state.setClipboard);
   const setVisible = useVisibility((state) => state.setVisible);
@@ -21,7 +23,7 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
     <>
       <div className="flex items-center gap-1.5">
         <button
-          title="Editar porta"
+          title={t('ui_edit_door_tooltip')}
           onClick={() => {
             useStore.setState(convertData(door), true);
             navigate('/settings/general');
@@ -32,12 +34,12 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
         </button>
 
         <button
-          title="Duplicar Porta"
+          title={t('ui_copy_door_tooltip')}
           onClick={() => {
             const cloneData = JSON.parse(JSON.stringify(door));
             delete cloneData.id;
             
-            const name = cloneData.name || "Porta";
+            const name = cloneData.name || t('ui_door_singular');
             const match = name.match(/^(.*?)\s*(\d+)$/);
             if (match) {
               const baseName = match[1];
@@ -60,7 +62,7 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
         </button>
 
         <button
-          title="Teleportar aqui"
+          title={t('ui_teleport_door_tooltip')}
           onClick={() => {
             setVisible(false);
             fetchNui('teleportToDoor', doorId);
@@ -74,7 +76,7 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
         </button>
 
         <button
-          title="Deletar porta"
+          title={t('ui_delete_door_tooltip')}
           onClick={() => setConfirmDelete(true)}
           className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
         >
@@ -93,11 +95,11 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
                 <Trash2 size={20} />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Excluir Porta</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('ui_delete_door_modal_title')}</h3>
             </div>
             
             <p className="text-sm text-muted-foreground mb-6">
-              Tem certeza que deseja excluir esta porta? Esta ação não poderá ser desfeita.
+              {t('ui_delete_door_modal_desc')}
             </p>
             
             <div className="flex justify-end gap-3">
@@ -105,7 +107,7 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                 onClick={() => setConfirmDelete(false)}
               >
-                Cancelar
+                {t('ui_btn_cancel')}
               </button>
               <button
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
@@ -114,7 +116,7 @@ const ActionsMenu: React.FC<{ door: DoorColumn }> = ({ door }) => {
                   setConfirmDelete(false);
                 }}
               >
-                Excluir
+                {t('ui_btn_delete')}
               </button>
             </div>
           </div>

@@ -12,11 +12,13 @@ import { useNavigate } from 'react-router-dom';
 import { useVisibility } from '../../../store/visibility';
 import { useDebug } from '../../../store/debug';
 import { defaultState } from '../../../store';
+import { useTranslation } from 'react-i18next';
 
 export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup | 'ungrouped'; children: React.ReactNode; onOpen?: () => void }) => {
+  const { t } = useTranslation();
   const isUngrouped = group === 'ungrouped';
   const groupId = isUngrouped ? 'ungrouped' : group.id;
-  const groupName = isUngrouped ? 'Portas Sem Grupo' : group.name;
+  const groupName = isUngrouped ? t('ui_group_ungrouped') : group.name;
 
   const doors = useDoors((state) => state.doors);
   const { selectedDoors, setSelectedDoors } = useSelection();
@@ -125,7 +127,7 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary rounded-lg text-sm font-bold transition-all"
               >
                 <Plus size={16} strokeWidth={2.5} />
-                <span>Nova Porta</span>
+                <span>{t('ui_new_door_btn')}</span>
               </button>
 
               <div className="w-px h-6 bg-border mx-1"></div>
@@ -143,23 +145,23 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
                       ? 'bg-primary/10 border-primary/40 text-primary shadow-sm' 
                       : 'bg-card/40 border-border/40 text-muted-foreground hover:border-border hover:bg-card'
                   }`}
-                  title="Debugar portas do grupo"
+                  title={t('ui_debug_group_tooltip')}
                 >
                   <Bug size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-widest">Debug</span>
+                  <span className="text-[10px] font-bold uppercase tracking-widest">{t('ui_debug_btn')}</span>
                 </button>
 
                 <button
                   onClick={handleTeleportGroup}
                   className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-primary/10"
-                  title="Teleportar para o grupo"
+                  title={t('ui_teleport_group_tooltip')}
                 >
                   <Navigation size={16} />
                 </button>
                 <button
                   onClick={handleDeleteGroup}
                   className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10"
-                  title="Excluir Grupo"
+                  title={t('ui_delete_group_tooltip')}
                 >
                   <Trash2 size={16} />
                 </button>
@@ -177,7 +179,7 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
             {children}
             {(!children || (Array.isArray(children) && children.length === 0)) && (
               <div className="flex items-center justify-center py-8 text-sm text-muted-foreground/50 border-2 border-dashed border-border/40 rounded-xl">
-                Nenhuma porta neste grupo
+                {t('ui_group_empty')}
               </div>
             )}
           </div>
@@ -195,11 +197,11 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
               <Trash2 size={20} />
             </div>
-            <h3 className="text-lg font-semibold text-foreground">Excluir Grupo</h3>
+            <h3 className="text-lg font-semibold text-foreground">{t('ui_delete_group_modal_title')}</h3>
           </div>
           
           <p className="text-sm text-muted-foreground mb-6">
-            Tem certeza que deseja excluir o grupo "{groupName}"? Esta ação não poderá ser desfeita e todas as portas dentro dele também serão excluídas.
+            {t('ui_delete_group_modal_desc', { groupName })}
           </p>
           
           <div className="flex justify-end gap-3">
@@ -207,7 +209,7 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
               className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
               onClick={() => setConfirmDelete(false)}
             >
-              Cancelar
+              {t('ui_btn_cancel')}
             </button>
             <button
               className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
@@ -216,7 +218,7 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
                 setConfirmDelete(false);
               }}
             >
-              Excluir
+              {t('ui_btn_delete')}
             </button>
           </div>
         </div>

@@ -143,6 +143,7 @@ function MriSelectSingle({
                 <MriCommandItem
                   key={opt.value}
                   value={`${String(opt.label)} ${String(opt.value)}`}
+                  disabled={opt.disabled as boolean}
                   onSelect={() => {
                     const newValue = String(opt.value)
                     if (clearable && String(value) === newValue) {
@@ -153,7 +154,7 @@ function MriSelectSingle({
                     setOpen(false)
                     setSearchValue("")
                   }}
-                  className="aria-selected:bg-accent aria-selected:text-accent-foreground rounded-md cursor-pointer"
+                  className={cn("aria-selected:bg-accent aria-selected:text-accent-foreground rounded-md", opt.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer")}
                 >
                   <Check
                     className={cn(
@@ -279,8 +280,9 @@ function MriSelectMultiple({
                 <MriCommandItem
                   key={opt.value}
                   value={opt.label}
+                  disabled={opt.disabled as boolean}
                   onSelect={() => handleToggle(opt.value)}
-                  className="aria-selected:bg-primary/10 aria-selected:text-primary rounded-lg cursor-pointer flex items-center justify-between py-2.5 px-3 transition-all active:scale-[0.98]"
+                  className={cn("aria-selected:bg-primary/10 aria-selected:text-primary rounded-lg cursor-pointer flex items-center justify-between py-2.5 px-3 transition-all active:scale-[0.98]", opt.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer")}
                 >
                   <div className="flex items-center gap-2">
                     <div className={cn(
