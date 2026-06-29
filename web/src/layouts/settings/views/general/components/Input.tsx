@@ -1,4 +1,5 @@
 import { HelpCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Props {
   label: string;
@@ -8,13 +9,15 @@ interface Props {
   tooltip?: string;
   disabled?: boolean;
   error?: string;
+  icon?: React.ReactNode;
 }
 
-const Input: React.FC<Props> = ({ label, type, tooltip, value, setValue, disabled, error }) => {
+const Input: React.FC<Props> = ({ label, type, tooltip, value, setValue, disabled, error, icon }) => {
   return (
-    <div className={`flex flex-col gap-1 ${disabled ? 'opacity-60' : ''}`}>
-      <div className="flex items-center gap-1">
-        <label className="text-xs font-medium text-muted-foreground">{label}</label>
+    <div className={cn("flex flex-col gap-1.5", disabled && "opacity-60")}>
+      <div className="flex items-center gap-1.5">
+        {icon && <div className="text-muted-foreground/70">{icon}</div>}
+        <label className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</label>
         {tooltip && (
           <div className="relative group">
             <HelpCircle size={12} className="text-muted-foreground/50 cursor-help" />
@@ -24,15 +27,25 @@ const Input: React.FC<Props> = ({ label, type, tooltip, value, setValue, disable
           </div>
         )}
       </div>
-      <input
-        type={type}
-        value={value}
-        disabled={disabled}
-        step={type === 'number' ? 0.1 : undefined}
-        onChange={(e) => setValue(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
-        className={`h-8 px-3 text-sm bg-muted/50 border ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-border focus:ring-primary focus:border-primary'} rounded-md outline-none focus:ring-1 text-foreground placeholder:text-muted-foreground transition-all ${disabled ? 'cursor-not-allowed' : ''}`}
-      />
-      {error && <span className="text-[10px] text-red-500 -mt-0.5">{error}</span>}
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          disabled={disabled}
+          step={type === 'number' ? 0.1 : undefined}
+          onChange={(e) => setValue(type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value)}
+          className={cn(
+            "w-full h-9 px-3 text-sm bg-card/60 border rounded-lg outline-none transition-all duration-150",
+            "text-foreground placeholder:text-muted-foreground/50",
+            "hover:bg-card hover:border-border/60",
+            error 
+              ? "border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/30" 
+              : "border-border/30 focus:border-primary/50 focus:ring-1 focus:ring-primary/20",
+            disabled && "cursor-not-allowed hover:bg-card/60 hover:border-border/30"
+          )}
+        />
+      </div>
+      {error && <span className="text-[11px] font-medium text-red-500/90 -mt-0.5">{error}</span>}
     </div>
   );
 };
