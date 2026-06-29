@@ -46,9 +46,12 @@ This will output the new UI files to the `web/build` folder, which the FiveM res
 
 **mri_Qdoorlock** is fully capable of operating as an embedded iframe plugin inside the **mri_Qadmin** panel.
 When accessed via the admin panel (embedded mode), it:
-- Automatically listens to `mri-plugin/init` and `mri-plugin/theme-changed` commands.
-- Dynamically parses the admin's Hex UI Colors and injects them internally as proper HSL Tailwind Variables (`--primary`, `--background`), syncing the theme in real-time.
-- Redirects NUI callback logic (like `fetchNui`) through the `BroadcastChannel` or ensures `window.location.hostname` is utilized properly to fix native iframe context loss.
+- **Automatic Styling**: Dynamically parses the admin's Hex UI Colors and injects them internally as proper HSL Tailwind Variables (`--primary`, `--background`), syncing the theme in real-time.
+- **NUI Communication Bridge**: Redirects NUI callback logic (like `fetchNui`) through the `BroadcastChannel` to fix native iframe context loss.
+- **Data Hydration**: Initializes state dynamically without native commands via the `requestData` callback, fetching doors, groups, sounds, and active debug states upon mount.
+- **Smart UI Yielding**: Automatically closes the parent `mri_Qadmin` panel via `window.parent.postMessage({ type: 'mri-plugin/request-close' }, '*')` when triggering actions that require in-game raycasting or physical interactions, such as:
+  - Teleporting to a Door or Group
+  - Duplicating a Door
 - Provides a completely seamless administrative experience without the need to type `/doorlock` separately.
 
 ## 👏 Credits
