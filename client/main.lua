@@ -181,24 +181,28 @@ RegisterNetEvent('ox_doorlock:setState', function(id, state, source, data)
 	if door.state == state and door.distance and door.distance < 20 then
 		if Config.NativeAudio then
 			RequestScriptAudioBank('dlc_oxdoorlock/oxdoorlock', false)
-			local sound = state == 0 and door.unlockSound or door.lockSound or 'door_bolt'
-			local soundId = GetSoundId()
-
-			PlaySoundFromCoord(soundId, sound, door.coords.x, door.coords.y, door.coords.z, 'DLC_OXDOORLOCK_SET', false, 0, false)
-			ReleaseSoundId(soundId)
+			local sound = state == 0 and door.unlockSound or door.lockSound
+			
+			if sound then
+				local soundId = GetSoundId()
+				PlaySoundFromCoord(soundId, sound, door.coords.x, door.coords.y, door.coords.z, 'DLC_OXDOORLOCK_SET', false, 0, false)
+				ReleaseSoundId(soundId)
+			end
 			ReleaseNamedScriptAudioBank('dlc_oxdoorlock/oxdoorlock')
 		else
 			local volume = (0.01 * GetProfileSetting(300)) / (door.distance / 2)
 			if volume > 1 then volume = 1 end
-			local sound = state == 0 and door.unlockSound or door.lockSound or 'door-bolt-4'
-
-			SendNUIMessage({
-				action = 'playSound',
-				data = {
-					sound = sound,
-					volume = volume
-				}
-			})
+			local sound = state == 0 and door.unlockSound or door.lockSound
+			
+			if sound then
+				SendNUIMessage({
+					action = 'playSound',
+					data = {
+						sound = sound,
+						volume = volume
+					}
+				})
+			end
 		end
 	end
 end)
