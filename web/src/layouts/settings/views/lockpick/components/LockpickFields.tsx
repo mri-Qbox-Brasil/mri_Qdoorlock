@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trash2, Settings } from 'lucide-react';
 import { useSetters, useStore } from '../../../../../store';
 import DifficultyModal from '../../characters/components/DifficultyModal';
+import { MriSelect } from '../../../../../components/molecules/MriSelect';
 
 const selectData: { label: string; value: string }[] = [
   { label: 'Fácil', value: 'easy' },
@@ -23,15 +24,13 @@ const LockpickFields: React.FC = () => {
     <div className="space-y-2">
       {lockpickFields.map((field, index) => (
         <div key={`${typeof field === 'string' ? field : field?.areaSize}-${index}`} className="flex items-center gap-2">
-          <select
-            className="flex-1 h-8 px-2 text-sm bg-muted/50 border border-border rounded-md outline-none text-foreground"
+          <MriSelect
+            options={selectData}
             value={typeof field === 'string' ? field : 'custom'}
+            onChange={() => {}}
             disabled
-          >
-            {selectData.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            className="flex-1"
+          />
           <button
             title="Editar linha"
             onClick={() => setModal({ opened: true, index })}

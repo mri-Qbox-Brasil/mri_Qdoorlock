@@ -1,5 +1,6 @@
 import Input from './Input';
 import { useStore, useSetters } from '../../../../../store';
+import { MriSelect } from '../../../../../components/molecules/MriSelect';
 
 const Inputs: React.FC = () => {
   const isBulkEdit = useStore((state) => state.isBulkEdit);
@@ -66,17 +67,15 @@ const Inputs: React.FC = () => {
         <div className="flex items-center gap-1">
           <label className="text-xs font-medium text-muted-foreground">Tipo de Fechadura</label>
         </div>
-        <select
+        <MriSelect
+          options={[
+            { label: 'Texto (Letras e Números)', value: 'text' },
+            { label: 'Teclado Numérico', value: 'numeric' },
+          ]}
           value={passcodeType || 'text'}
-          onChange={(e) => setPasscodeType(e.target.value)}
-          className="h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground transition-all"
-        >
-          <option value="text">Texto (Letras e Números)</option>
-          <option value="numeric">Teclado Numérico</option>
-          <option value="dui" disabled>DUI (Em Breve...)</option>
-          <option value="digital" disabled>Digital (Em Breve...)</option>
-          <option value="facial" disabled>Reconhecimento Facial (Em Breve...)</option>
-        </select>
+          onChange={(val) => setPasscodeType(val)}
+          placeholder="Selecionar tipo..."
+        />
       </div>
     </div>
   );

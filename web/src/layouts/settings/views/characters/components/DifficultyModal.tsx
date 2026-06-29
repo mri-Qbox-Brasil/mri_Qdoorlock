@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSetters, useStore } from '../../../../../store';
+import { MriSelect } from '../../../../../components/molecules/MriSelect';
 
 interface Props {
   selectData: { value: string; label: string }[];
@@ -39,15 +40,11 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-muted-foreground">Dificuldade</label>
-        <select
+        <MriSelect
+          options={selectData}
           value={select}
-          onChange={(e) => setSelect(e.target.value)}
-          className="h-8 px-2 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary text-foreground"
-        >
-          {selectData.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          onChange={(val) => setSelect(val)}
+        />
       </div>
 
       <div className="flex flex-col gap-1">
