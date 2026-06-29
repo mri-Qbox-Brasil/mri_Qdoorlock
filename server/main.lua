@@ -446,3 +446,36 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 
 	TriggerClientEvent('ox_doorlock:updateGroup', -1, id, data)
 end)
+
+local function registerPlugin()
+    if GetResourceState('mri_Qadmin') ~= 'started' then return end
+    local ok, result = pcall(function()
+        return exports['mri_Qadmin']:RegisterPlugin({
+            id = 'doorlock',
+            label = 'Portas',
+            icon = 'door-closed',
+            resource = 'mri_Qdoorlock',
+            htmlPath = 'web/build/index.html',
+            requiredPerms = { 'command.doorlock' },
+            description = 'Gerenciamento de portas e acessos do servidor',
+        })
+    end)
+    if not ok or result == false then
+        print(('[mri_Qdoorlock] Falha ao registrar plugin no mri_Qadmin: %s'):format(tostring(result)))
+    end
+end
+
+CreateThread(function()
+    local deadline = GetGameTimer() + 10000
+    while GetResourceState('mri_Qadmin') ~= 'started' and GetGameTimer() < deadline do
+        Wait(200)
+    end
+    registerPlugin()
+end)
+
+AddEventHandler('onResourceStart', function(resourceName)
+    if resourceName == 'mri_Qadmin' then
+        Wait(500)
+        registerPlugin()
+    end
+end)
