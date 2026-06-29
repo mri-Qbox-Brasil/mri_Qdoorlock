@@ -110,6 +110,7 @@ RegisterNUICallback('notify', function(data, cb)
 end)
 
 local function handleCreateDoor(data)
+	table.wipe(tempData)
 	data.state = (data.state == true or data.state == 1) and 1 or 0
 
 	if data.items and not next(data.items) then
@@ -132,7 +133,7 @@ local function handleCreateDoor(data)
 		SetNuiFocus(false, false)
 		ClearTimecycleModifier()
 		isAddingDoorlock = true
-		local doorCount = data.doors and 2 or 1
+		local doorCount = (data.doors and type(data.doors) == 'table' and data.doors[1]) and 2 or 1
 		local lastEntity = 0
 
 		lib.showTextUI(locale('add_door_textui'))
@@ -208,7 +209,7 @@ local function handleCreateDoor(data)
 					100, false, false, 0, true, false, false, false)
 			end
 
-			if hit and entity > 0 and GetEntityType(entity) ~= 0 and GetEntityType(entity) ~= 1 and GetEntityType(entity) ~= 2 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id) then
+			if hit and entity > 0 and GetEntityType(entity) ~= 0 and GetEntityType(entity) ~= 1 and GetEntityType(entity) ~= 2 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id == nil and -1 or data.id) then
 				if changedEntity then
 					SetEntityDrawOutline(entity, true)
 				end
@@ -683,7 +684,20 @@ Citizen.CreateThread(function()
 							elseif IsControlJustPressed(0, 47) then
 								local cloneData = json.decode(json.encode(door))
 								cloneData.id = nil
-								
+								-- Strip stale entity/position data so selection loop starts fresh
+								cloneData.coords = nil
+								cloneData.heading = nil
+								cloneData.model = nil
+								if cloneData.doors then
+									-- Keep structure (so doorCount=2) but wipe stale position/entity refs
+									for i = 1, 2 do
+										if cloneData.doors[i] then
+											cloneData.doors[i].coords = nil
+											cloneData.doors[i].heading = nil
+											cloneData.doors[i].entity = nil
+										end
+									end
+								end
 								local baseName, numStr = string.match(door.name or "Porta", "^(.-)%s*(%d+)$")
 								if baseName then
 									cloneData.name = baseName .. (baseName == "" and "" or " ") .. tostring(tonumber(numStr) + 1)
