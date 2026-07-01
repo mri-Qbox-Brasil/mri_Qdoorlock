@@ -4,13 +4,15 @@ import { fetchNui } from '../../utils/fetchNui';
 import { useClipboard } from '../../store/clipboard';
 import { useVisibility } from '../../store/visibility';
 import { useSelection } from '../../store/selection';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const Submit: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const activeTab = location.pathname.substring(10);
   const clipboard = useClipboard((state) => state.clipboard);
   const setVisible = useVisibility((state) => state.setVisible);
   const { selectedDoors, clearSelection } = useSelection();
@@ -123,7 +125,7 @@ const Submit: React.FC = () => {
   return (
     <>
       <div className="flex flex-col gap-2 pt-3 border-t border-border">
-        {hasId && !isBulkEdit && (
+        {hasId && !isBulkEdit && activeTab === 'general' && (
           <button
             onClick={() => setConfirmReselect(true)}
             className="w-full flex items-center justify-center gap-2 h-9 rounded-md border border-primary/50 text-primary hover:bg-primary/10 text-sm font-semibold transition-colors"

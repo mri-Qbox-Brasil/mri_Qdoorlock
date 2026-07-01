@@ -30,7 +30,7 @@ const ItemsModal: React.FC<Props> = ({ modal, setModal }) => {
       <div className="flex flex-col gap-1">
         <label className="text-xs font-medium text-muted-foreground">Metadata (type)</label>
         <input
-          className="h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+          className="h-9 px-3 text-sm bg-card/60 border border-border/30 rounded-lg outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 hover:bg-card hover:border-border/60 transition-all"
           value={(metadata as string) || ''}
           onChange={(e) => setMetadata(e.target.value)}
         />

@@ -20,7 +20,7 @@ const CharacterFields: React.FC = () => {
       {characters.map((field, index) => (
         <div key={`char-${index}`} className="flex items-center gap-2">
           <input
-            className="flex-1 h-8 px-3 text-sm bg-muted/50 border border-border rounded-md outline-none focus:ring-1 focus:ring-primary focus:border-primary text-foreground placeholder:text-muted-foreground transition-all"
+            className="flex-1 h-9 px-3 text-sm bg-card/60 border border-border/30 rounded-lg outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/50 text-foreground placeholder:text-muted-foreground/50 hover:bg-card hover:border-border/60 transition-all"
             placeholder="Citizen ID"
             value={field as string}
             onChange={(e) => handleChange(e.target.value, index)}

@@ -22,6 +22,19 @@ const LockpickFields: React.FC = () => {
     setLockpickFields((prevState) => prevState.filter((_obj, indx) => indx !== index));
   };
 
+  const handleSelectChange = (index: number, val: string) => {
+    setLockpickFields((prevState) => {
+      const array = [...prevState];
+      if (val === 'custom') {
+        array[index] = { areaSize: 50, speedMultiplier: 1 };
+        setTimeout(() => setModal({ opened: true, index }), 10);
+      } else {
+        array[index] = val;
+      }
+      return array;
+    });
+  };
+
   return (
     <div className="space-y-2">
       {lockpickFields.map((field, index) => (
@@ -29,8 +42,7 @@ const LockpickFields: React.FC = () => {
           <MriSelect
             options={selectData}
             value={typeof field === 'string' ? field : 'custom'}
-            onChange={() => {}}
-            disabled
+            onChange={(val) => handleSelectChange(index, val)}
             className="flex-1"
           />
           <button
