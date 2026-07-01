@@ -18,6 +18,9 @@ An advanced, highly optimized, and robust doorlock system for FiveM, heavily bas
 - [oxmysql](https://github.com/overextended/oxmysql) (v2.4.0+)
 - [ox_lib](https://github.com/overextended/ox_lib) (v3.30.4+)
 
+### 🔌 Optional Integrations
+- [t3_lockpick](https://github.com/T3development/t3_lockpick): The system automatically detects if you have this lockpick minigame installed and unlocks a new option in the UI, allowing you to seamlessly choose between the default `ox_lib` skillcheck and `t3_lockpick` for each door.
+
 ## 📥 Installation
 
 1. Download the repository and place it in your `resources` folder.
