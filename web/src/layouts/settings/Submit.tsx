@@ -1,7 +1,6 @@
-import { ClipboardCheck, Trash2, Save, MapPin, PlusCircle } from 'lucide-react';
+import { Trash2, Save, MapPin, PlusCircle } from 'lucide-react';
 import { useStore } from '../../store';
 import { fetchNui } from '../../utils/fetchNui';
-import { useClipboard } from '../../store/clipboard';
 import { useVisibility } from '../../store/visibility';
 import { useSelection } from '../../store/selection';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,7 +12,6 @@ const Submit: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const activeTab = location.pathname.substring(10);
-  const clipboard = useClipboard((state) => state.clipboard);
   const setVisible = useVisibility((state) => state.setVisible);
   const { selectedDoors, clearSelection } = useSelection();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -143,38 +141,6 @@ const Submit: React.FC = () => {
           >
             {hasId ? <Save size={15} /> : <PlusCircle size={15} />}
             {hasId ? t('ui_save_door') : t('ui_create_door_btn')}
-          </button>
-
-          {/* Paste clipboard */}
-          <button
-            title={!clipboard ? t('ui_clipboard_empty_tooltip') : t('ui_clipboard_apply_tooltip')}
-            disabled={!clipboard}
-            onClick={() => {
-              if (!clipboard) return;
-              useStore.setState({
-                name: '',
-                passcode: clipboard.passcode,
-                autolock: clipboard.autolock,
-                items: clipboard.items,
-                characters: clipboard.characters,
-                groups: clipboard.groups,
-                maxDistance: clipboard.maxDistance,
-                doorRate: clipboard.doorRate,
-                lockSound: clipboard.lockSound,
-                unlockSound: clipboard.unlockSound,
-                auto: clipboard.auto,
-                state: clipboard.state,
-                lockpick: clipboard.lockpick,
-                hideUi: clipboard.hideUi,
-                doors: clipboard.doors,
-                lockpickDifficulty: clipboard.lockpickDifficulty,
-                holdOpen: clipboard.holdOpen,
-              }, true);
-              fetchNui('notify', t('ui_clipboard_applied_toast'));
-            }}
-            className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-muted-foreground hover:text-primary hover:border-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <ClipboardCheck size={16} />
           </button>
 
           {/* Delete */}
