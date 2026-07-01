@@ -25,9 +25,11 @@ const Doors: React.FC = () => {
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
       {successMsg && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-green-500/15 border border-green-500/30 text-green-400 px-4 py-2.5 rounded-xl shadow-xl shadow-green-500/5 animate-in fade-in slide-in-from-top-4 duration-300">
-          <CheckCircle2 size={16} className="text-green-500" />
-          <span className="text-sm font-medium tracking-wide">{t(successMsg)}</span>
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-5 py-3 bg-card border border-border/80 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-bottom-6 duration-300 ease-out">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary shadow-inner shadow-primary/20">
+            <CheckCircle2 size={18} />
+          </div>
+          <span className="text-sm font-semibold text-foreground">{t(successMsg)}</span>
         </div>
       )}
       <Header />
