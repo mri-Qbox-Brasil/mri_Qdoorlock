@@ -31,8 +31,14 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
     const newErrors: typeof errors = {};
     
     if (lockpickSystem === 't3_lockpick') {
-      if (select === 'custom' && (!t3Difficulty || t3Difficulty < 1)) newErrors.t3Difficulty = t('ui_error_required');
-      if (select === 'custom' && (!t3Pins || t3Pins < 1)) newErrors.t3Pins = t('ui_error_required');
+      if (select === 'custom') {
+        if (!t3Difficulty || t3Difficulty < 1) newErrors.t3Difficulty = t('ui_error_required');
+        else if (t3Difficulty > 10) newErrors.t3Difficulty = t('ui_error_max_10') || 'Max 10';
+        
+        if (!t3Pins) newErrors.t3Pins = t('ui_error_required');
+        else if (t3Pins < 3) newErrors.t3Pins = t('ui_error_min_3') || 'Min 3';
+        else if (t3Pins > 9) newErrors.t3Pins = t('ui_error_max_9') || 'Max 9';
+      }
     } else {
       if (select === 'custom' && !areaSize) newErrors.areaSize = t('ui_error_required');
       if (select === 'custom' && !speedMultiplier) newErrors.speedMultiplier = t('ui_error_required');
@@ -104,7 +110,7 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
               type="number"
               value={stages}
               min={1}
-              max={10}
+              max={100}
               disabled={select !== 'custom'}
               onChange={(e) => setStages(parseInt(e.target.value) || 1)}
               className="h-9 px-3 text-sm bg-card/60 border border-border/30 rounded-lg outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/50 text-foreground disabled:opacity-40 hover:bg-card hover:border-border/60 transition-all"
@@ -120,7 +126,6 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
               type="number"
               value={t3Difficulty}
               min={1}
-              max={10}
               disabled={select !== 'custom'}
               onChange={(e) => setT3Difficulty(parseInt(e.target.value) || 1)}
               className="h-9 px-3 text-sm bg-card/60 border border-border/30 rounded-lg outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/50 text-foreground disabled:opacity-40 hover:bg-card hover:border-border/60 transition-all"
@@ -134,7 +139,6 @@ const DifficultyModal: React.FC<Props> = ({ selectData, setModal, modal }) => {
               type="number"
               value={t3Pins}
               min={1}
-              max={20}
               disabled={select !== 'custom'}
               onChange={(e) => setT3Pins(parseInt(e.target.value) || 1)}
               className="h-9 px-3 text-sm bg-card/60 border border-border/30 rounded-lg outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary/50 text-foreground disabled:opacity-40 hover:bg-card hover:border-border/60 transition-all"
