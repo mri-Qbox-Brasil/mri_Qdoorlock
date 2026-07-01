@@ -22,7 +22,7 @@ import './i18n';
 import { useTranslation } from 'react-i18next';
 
 const App: React.FC = () => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const setSounds = useSetters((setter) => setter.setSounds);
   const [visible, setVisible] = useVisibility((state) => [state.visible, state.setVisible]);
   const doors = useDoors((state) => state.doors);
@@ -129,6 +129,9 @@ const App: React.FC = () => {
       if (data && data.debugGroupId !== undefined) {
         useDebug.setState({ debugGroupId: data.debugGroupId === false ? null : Number(data.debugGroupId) });
       }
+      if (data && data.hasT3Lockpick !== undefined) {
+        useStore.setState({ hasT3Lockpick: data.hasT3Lockpick });
+      }
     }).catch((err) => {
       console.error('Failed to request data:', err);
       setLocaleLoaded(true);
@@ -202,7 +205,7 @@ const App: React.FC = () => {
     if (isPlugin) {
       sendToHost({ type: 'mri-plugin/request-close' });
     }
-  });
+  }, deleteDoorId === null);
 
   if (!localeLoaded) return null;
 
@@ -231,18 +234,17 @@ const App: React.FC = () => {
         <>
           <div 
             className="fixed inset-0 z-50 bg-transparent" 
-            onClick={() => { setDeleteDoorId(null); fetchNui('exit'); }} 
           />
           <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-80 bg-card border border-border/60 rounded-2xl shadow-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
                 <Trash2 size={20} />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Deletar Porta</h3>
+              <h3 className="text-lg font-semibold text-foreground">{t('ui_delete_door_modal_title') || 'Deletar Porta'}</h3>
             </div>
             
             <p className="text-sm text-muted-foreground mb-6">
-              Tem certeza que deseja deletar permanentemente esta porta? Esta ação não pode ser desfeita.
+              {t('ui_delete_door_modal_desc') || 'Tem certeza que deseja deletar permanentemente esta porta? Esta ação não pode ser desfeita.'}
             </p>
             
             <div className="flex justify-end gap-3">
@@ -250,7 +252,7 @@ const App: React.FC = () => {
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
                 onClick={() => { setDeleteDoorId(null); fetchNui('exit'); }}
               >
-                Cancelar
+                {t('ui_btn_cancel') || 'Cancelar'}
               </button>
               <button
                 className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
@@ -260,7 +262,7 @@ const App: React.FC = () => {
                   fetchNui('exit');
                 }}
               >
-                Deletar
+                {t('ui_btn_delete') || 'Deletar'}
               </button>
             </div>
           </div>

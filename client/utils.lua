@@ -57,7 +57,43 @@ local function pickLock(entity)
 
 	TaskPlayAnim(cache.ped, animDict, 'pick_door', 3.0, 1.0, -1, 49, 0, true, true, true)
 
-	local success = lib.skillCheck(door.lockpickDifficulty or Config.LockDifficulty)
+	local success = false
+	if door.lockpickSystem == 't3_lockpick' and (GetResourceState('t3_lockpick') == 'started' or GetResourceState('t3_lockpick') == 'starting') then
+		local t3Diff = 2
+		local t3Pins = 4
+		local diffConf = door.lockpickDifficulty and door.lockpickDifficulty[1] or 'medium'
+		
+		if type(diffConf) == 'string' then
+			if diffConf == 'easy' then t3Diff = 1; t3Pins = 3
+			elseif diffConf == 'medium' then t3Diff = 2; t3Pins = 4
+			elseif diffConf == 'hard' then t3Diff = 3; t3Pins = 5
+			end
+		elseif type(diffConf) == 'table' then
+			t3Diff = diffConf.difficulty or 2
+			t3Pins = diffConf.pins or 4
+		end
+		
+		success = exports['t3_lockpick']:startLockpick(Config.LockpickItems[1], t3Diff, t3Pins)
+	else
+		local difficulty = door.lockpickDifficulty or Config.LockDifficulty
+		if type(difficulty) == 'table' then
+			local expanded = {}
+			for i = 1, #difficulty do
+				local diff = difficulty[i]
+				if type(diff) == 'table' and diff.stages and diff.stages > 1 then
+					for _ = 1, diff.stages do
+						expanded[#expanded + 1] = { areaSize = diff.areaSize, speedMultiplier = diff.speedMultiplier }
+					end
+				else
+					expanded[#expanded + 1] = diff
+				end
+			end
+			difficulty = expanded
+		end
+
+		success = lib.skillCheck(difficulty)
+	end
+
 	local rand = math.random(1, success and 100 or 5)
 
 	if success then
@@ -254,12 +290,16 @@ local function handleCreateDoor(data)
 			data.heading = tempData[1].heading
 		end
 	else
+		local oldDoor = doors[data.id]
+
 		if data.doors and type(data.doors) == 'table' then
 			for i = 1, 2 do
 				if data.doors[i] then
 					local coords = data.doors[i].coords
 					if coords and type(coords) == 'table' and coords.x then
 						data.doors[i].coords = vector3(coords.x, coords.y, coords.z)
+					elseif not coords and oldDoor and oldDoor.doors and oldDoor.doors[i] then
+						data.doors[i].coords = oldDoor.doors[i].coords
 					end
 					data.doors[i].entity = nil
 				end
@@ -271,6 +311,8 @@ local function handleCreateDoor(data)
 
 		if data.coords and type(data.coords) == 'table' and data.coords.x then
 			data.coords = vector3(data.coords.x, data.coords.y, data.coords.z)
+		elseif not data.coords and oldDoor then
+			data.coords = oldDoor.coords
 		end
 		data.distance = nil
 		data.zone = nil
@@ -325,7 +367,7 @@ RegisterNUICallback('editDoorsBulk', function(data, cb)
 				for k, v in pairs(door) do fullData[k] = v end
 				local updatableKeys = {
 					'state', 'passcode', 'passcodeType', 'passcodeCoords', 'autolock', 'maxDistance', 'doorRate', 
-					'auto', 'lockpick', 'hideUi', 'holdOpen', 'items', 'characters', 
+					'auto', 'lockpick', 'lockpickSystem', 'hideUi', 'holdOpen', 'items', 'characters', 
 					'groups', 'lockpickDifficulty', 'lockSound', 'unlockSound'
 				}
 				
@@ -477,32 +519,34 @@ Citizen.CreateThread(function()
 						local text = ("[%s] %s"):format(door.id, door.name)
 						
 						if door.id == targetedDoorId and not isAddingDoorlock then
-							text = text .. "\n~g~[ENTER]~w~ Editar | ~b~[G]~w~ Duplicar | ~r~[BACKSPACE]~w~ Deletar"
-							if IsControlJustPressed(0, 191) then
-								openUi(door.id)
-							elseif IsControlJustPressed(0, 47) then
-								local cloneData = json.decode(json.encode(door))
-								cloneData.id = nil
-								
-								local baseName, numStr = string.match(door.name or "Porta", "^(.-)%s*(%d+)$")
-								if baseName then
-									cloneData.name = baseName .. (baseName == "" and "" or " ") .. tostring(tonumber(numStr) + 1)
-								else
-									cloneData.name = (door.name or "Porta") .. " 2"
+							text = text .. "\n~g~[ENTER]~w~ " .. locale('debug_edit') .. " | ~b~[G]~w~ " .. locale('debug_duplicate') .. " | ~r~[BACKSPACE]~w~ " .. locale('debug_delete')
+							if not IsNuiFocused() then
+								if IsControlJustPressed(0, 191) then
+									openUi(door.id)
+								elseif IsControlJustPressed(0, 47) then
+									local cloneData = json.decode(json.encode(door))
+									cloneData.id = nil
+									
+									local baseName, numStr = string.match(door.name or "Porta", "^(.-)%s*(%d+)$")
+									if baseName then
+										cloneData.name = baseName .. (baseName == "" and "" or " ") .. tostring(tonumber(numStr) + 1)
+									else
+										cloneData.name = (door.name or "Porta") .. " 2"
+									end
+									
+									cloneData.reselect = true
+									
+									CreateThread(function()
+										handleCreateDoor(cloneData)
+									end)
+								elseif IsControlJustPressed(0, 194) then
+									SetNuiFocus(true, true)
+									SetTimecycleModifier('hud_def_blur')
+									SendNUIMessage({
+										action = 'confirmDeleteDoor',
+										data = door.id
+									})
 								end
-								
-								cloneData.reselect = true
-								
-								CreateThread(function()
-									handleCreateDoor(cloneData)
-								end)
-							elseif IsControlJustPressed(0, 194) then
-								SetNuiFocus(true, true)
-								SetTimecycleModifier('hud_def_blur')
-								SendNUIMessage({
-									action = 'confirmDeleteDoor',
-									data = door.id
-								})
 							end
 						end
 						DrawText3D(door.coords.x, door.coords.y, door.coords.z + 0.5, text)
@@ -534,6 +578,18 @@ RegisterNUICallback('createGroup', function(data, cb)
 	if not data or not data.name or type(data.name) ~= 'string' then return end
 	local coords = GetEntityCoords(cache.ped)
 	TriggerServerEvent('ox_doorlock:editGroup', false, {
+		name = data.name,
+		coords = coords
+	})
+end)
+
+RegisterNUICallback('editGroup', function(data, cb)
+	cb(1)
+	if not data or not data.id or not data.name or type(data.name) ~= 'string' then return end
+	
+	local coords = data.updateCoords and GetEntityCoords(cache.ped) or (doorGroups[data.id] and doorGroups[data.id].coords)
+	
+	TriggerServerEvent('ox_doorlock:editGroup', tonumber(data.id), {
 		name = data.name,
 		coords = coords
 	})
@@ -586,6 +642,7 @@ RegisterNetEvent('ox_doorlock:updateGroup', function(id, data)
 			end
 			data.streetName = streetName
 		end
+		data.id = id
 		doorGroups[data.id] = data
 	else
 		doorGroups[id] = nil
@@ -668,13 +725,16 @@ RegisterNUICallback('requestData', function(_, cb)
 		end
 	end
 
+	local hasT3Lockpick = GetResourceState('t3_lockpick') == 'started' or GetResourceState('t3_lockpick') == 'starting'
+
 	cb({
 		doors = doors,
 		doorGroups = doorGroups,
 		sounds = soundFiles,
 		debugGroupId = debugGroupId,
 		locale = localeStr,
-		locales = translations
+		locales = translations,
+		hasT3Lockpick = hasT3Lockpick
 	})
 
 	SendNuiMessage(json.encode({

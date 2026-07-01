@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DoorGroup } from '../../../store/doorGroups';
 import * as Accordion from '@radix-ui/react-accordion';
-import { ChevronDown, Plus, Trash2, MapPin, Navigation, Bug, Check } from 'lucide-react';
+import { ChevronDown, Plus, Trash2, MapPin, Navigation, Bug, Check, Pencil, AlertTriangle } from 'lucide-react';
 import { fetchNui } from '../../../utils/fetchNui';
 import { useDoors } from '../../../store/doors';
 import * as Checkbox from '@radix-ui/react-checkbox';
@@ -48,6 +48,9 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
   const setVisible = useVisibility((state) => state.setVisible);
   const { debugGroupId, toggleDebugGroup } = useDebug();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [updateCoords, setUpdateCoords] = useState(false);
 
   const isDebugging = !isUngrouped && debugGroupId === group.id;
 
@@ -55,8 +58,7 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
     e.stopPropagation();
     if (isUngrouped) return;
     
-    // Clear the store and prepare for new door
-    useStore.setState({ ...defaultState, doorGroupId: group.id }, true);
+    useStore.setState({ ...defaultState, doorGroupId: group.id, hasT3Lockpick: useStore.getState().hasT3Lockpick }, true);
     navigate('/settings/general');
   };
 
@@ -88,9 +90,9 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
     <Accordion.Item value={`group-${groupId}`} className="mb-4 bg-card/40 border border-border/40 rounded-2xl overflow-hidden shadow-sm">
       <Accordion.Header>
         <Accordion.Trigger className="w-full flex items-center justify-between p-4 hover:bg-card/80 transition-colors group">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <div 
-              className="mr-1 flex items-center justify-center"
+              className="mr-1 flex items-center justify-center flex-shrink-0"
               onClick={(e) => e.stopPropagation()}
             >
               <Checkbox.Root
@@ -108,12 +110,12 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
               </Checkbox.Root>
             </div>
             
-            <ChevronDown size={20} className="text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-            <span className="font-bold text-lg text-foreground tracking-wide">{groupName}</span>
+            <ChevronDown size={20} className="text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180 flex-shrink-0" />
+            <span className="font-bold text-lg text-foreground tracking-wide truncate" title={groupName}>{groupName}</span>
             {!isUngrouped && (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2">
-                <MapPin size={12} className="opacity-60" />
-                <span>
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground ml-2 min-w-0 truncate">
+                <MapPin size={12} className="opacity-60 flex-shrink-0" />
+                <span className="truncate">
                   {group.streetName || (group.coords ? `${Math.round(group.coords.x)}, ${Math.round(group.coords.y)}` : 'N/A')}
                 </span>
               </span>
@@ -157,6 +159,18 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
                   title={t('ui_teleport_group_tooltip')}
                 >
                   <Navigation size={16} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditName(groupName);
+                    setUpdateCoords(false);
+                    setIsEditing(true);
+                  }}
+                  className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-primary transition-colors rounded-lg hover:bg-primary/10"
+                  title={t('ui_edit_group_tooltip')}
+                >
+                  <Pencil size={16} />
                 </button>
                 <button
                   onClick={handleDeleteGroup}
@@ -219,6 +233,80 @@ export const GroupDroppable = ({ group, children, onOpen }: { group: DoorGroup |
               }}
             >
               {t('ui_btn_delete')}
+            </button>
+          </div>
+        </div>
+      </>
+    )}
+    
+    {isEditing && !isUngrouped && (
+      <>
+        <div 
+          className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm" 
+          onClick={() => setIsEditing(false)} 
+        />
+        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-[400px] bg-card border border-border/60 rounded-2xl shadow-2xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
+              <Pencil size={20} />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">{t('ui_edit_group_modal_title')}</h3>
+          </div>
+          
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">{t('ui_group_name_label') || 'Group Name'}</label>
+              <input 
+                type="text" 
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary transition-colors"
+                placeholder={t('ui_group_name_placeholder')}
+              />
+            </div>
+
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mt-4">
+              <div className="flex items-center gap-2 text-primary mb-2">
+                <MapPin size={16} />
+                <h4 className="font-semibold text-sm">{t('ui_edit_group_location_title') || 'Location'}</h4>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                {t('ui_edit_group_location_desc') || 'Update the group coordinates to your current position in the game.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setUpdateCoords(!updateCoords)}
+                className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                  updateCoords 
+                    ? 'bg-primary text-primary-foreground border-primary shadow-md shadow-primary/20' 
+                    : 'bg-background text-foreground border-border hover:bg-muted hover:border-border/80'
+                }`}
+              >
+                {updateCoords && <Check size={14} />}
+                {t('ui_edit_group_save_location_btn') || 'Update Location to Current'}
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-3">
+            <button
+              className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
+              onClick={() => setIsEditing(false)}
+            >
+              {t('ui_btn_cancel')}
+            </button>
+            <button
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+              onClick={() => {
+                fetchNui('editGroup', {
+                  id: group.id,
+                  name: editName,
+                  updateCoords: updateCoords
+                });
+                setIsEditing(false);
+              }}
+            >
+              {t('ui_btn_save') || 'SAVE'}
             </button>
           </div>
         </div>

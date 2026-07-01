@@ -50,6 +50,7 @@ local function encodeData(door)
 		passcodeType = door.passcodeType,
 		passcodeCoords = door.passcodeCoords,
 		lockpickDifficulty = door.lockpickDifficulty,
+		lockpickSystem = door.lockpickSystem,
 		doorGroupId = door.doorGroupId
 	})
 end
@@ -444,6 +445,7 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 	if id then
 		id = tonumber(id) or id
 		if data then
+			data.id = id
 			MySQL.update('UPDATE mri_qdoorlock_groups SET name = ?, coords = ? WHERE id = ?',
 				{ data.name, json.encode(data.coords), id })
 			groups[id] = data
@@ -461,6 +463,7 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 	else
 		local insertId = MySQL.insert.await('INSERT INTO mri_qdoorlock_groups (name, coords) VALUES (?, ?)',
 			{ data.name, json.encode(data.coords) })
+		id = insertId
 		data.id = insertId
 		groups[insertId] = data
 	end

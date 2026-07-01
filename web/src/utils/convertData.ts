@@ -1,5 +1,5 @@
 import { DoorColumn } from '../store/doors';
-import { StoreState } from '../store';
+import { StoreState, useStore } from '../store';
 
 // Converts groups data into array format
 export const convertData = (data: DoorColumn) => {
@@ -17,8 +17,10 @@ export const convertData = (data: DoorColumn) => {
     groups: [...newGroupsData],
     items: data.items || [{ name: '', metadata: '', remove: false }],
     lockpickDifficulty: data.lockpickDifficulty || [''],
+    lockpickSystem: data.lockpickSystem || 'ox_lib',
     doorGroupId: data.doorGroupId || null,
     passcodeType: data.passcodeType || 'text',
     passcodeCoords: data.passcodeCoords || null,
+    hasT3Lockpick: useStore.getState().hasT3Lockpick,
   } as StoreState;
 };

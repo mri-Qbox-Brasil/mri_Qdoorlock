@@ -62,7 +62,8 @@ const Header: React.FC = () => {
         <button
           title={t('ui_create_door_tooltip')}
           onClick={() => {
-            useStore.setState(defaultState, true);
+            fetchNui('setDebugGroup', null).catch(() => {});
+            useStore.setState({ ...defaultState, hasT3Lockpick: useStore.getState().hasT3Lockpick }, true);
             navigate('/settings/general');
           }}
           className="flex items-center justify-center w-8 h-8 rounded-md border border-border/50 hover:bg-primary/10 hover:border-primary hover:text-primary transition-all text-muted-foreground"

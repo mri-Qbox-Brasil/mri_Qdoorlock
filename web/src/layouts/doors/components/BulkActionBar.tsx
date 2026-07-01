@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../../store';
 import { useDoors } from '../../../store/doors';
 import { convertData } from '../../../utils/convertData';
+import { useTranslation } from 'react-i18next';
 
 export const BulkActionBar = () => {
   const { selectedDoors, clearSelection } = useSelection();
@@ -15,6 +16,7 @@ export const BulkActionBar = () => {
   const doors = useDoors((state) => state.doors);
   const navigate = useNavigate();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const { t } = useTranslation();
 
   if (selectedDoors.length === 0) return null;
 
@@ -41,7 +43,9 @@ export const BulkActionBar = () => {
         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm">
           {selectedDoors.length}
         </div>
-        <span className="font-semibold text-foreground">Portas Selecionadas</span>
+        <span className="font-semibold text-foreground">
+          {selectedDoors.length === 1 ? t('ui_bulk_selected_door') : t('ui_bulk_selected_doors')}
+        </span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -49,7 +53,7 @@ export const BulkActionBar = () => {
           <Popover.Trigger asChild>
             <button className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-semibold transition-colors shadow-lg shadow-primary/20">
               <MoveRight size={16} />
-              Mover de Grupo
+              {t('ui_bulk_move_group')}
             </button>
           </Popover.Trigger>
           <Popover.Portal>
@@ -59,7 +63,7 @@ export const BulkActionBar = () => {
                   onClick={() => handleMoveToGroup('ungrouped')}
                   className="flex items-center w-full px-3 py-2 text-sm font-medium text-left rounded-md hover:bg-muted text-foreground transition-colors"
                 >
-                  Remover do Grupo (Sem Grupo)
+                  {t('ui_bulk_remove_group')}
                 </button>
                 <div className="h-px bg-border/50 my-1 mx-2" />
                 {Object.values(doorGroups).map((group) => (
@@ -79,25 +83,25 @@ export const BulkActionBar = () => {
         <button
           onClick={handleEditBulk}
           className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow-lg hover:shadow-primary/20"
-          title="Editar portas selecionadas em massa"
+          title={selectedDoors.length === 1 ? t('ui_edit_door_tooltip') : t('ui_bulk_edit_doors')}
         >
           <Pencil size={16} />
-          Editar
+          {selectedDoors.length === 1 ? t('ui_bulk_edit_door') : t('ui_bulk_edit_doors')}
         </button>
 
         <button
           onClick={() => setConfirmDelete(true)}
           className="flex items-center gap-2 px-4 py-2 bg-destructive/10 hover:bg-destructive text-destructive hover:text-destructive-foreground rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow-lg hover:shadow-destructive/20 ml-2"
-          title="Excluir portas selecionadas"
+          title={t('ui_bulk_delete_title')}
         >
           <Trash2 size={16} />
-          Excluir Selecionadas
+          {selectedDoors.length === 1 ? t('ui_bulk_delete_door') : t('ui_bulk_delete_doors')}
         </button>
 
         <button
           onClick={clearSelection}
           className="p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg transition-colors ml-2"
-          title="Limpar seleção"
+          title={t('ui_bulk_clear_selection')}
         >
           <X size={20} />
         </button>
@@ -109,36 +113,37 @@ export const BulkActionBar = () => {
             className="fixed inset-0 z-[300] bg-background/80 backdrop-blur-sm" 
             onClick={() => setConfirmDelete(false)} 
           />
-          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[301] w-80 bg-card border border-border/60 rounded-2xl shadow-2xl p-6 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
-                <Trash2 size={20} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[301] w-80 bg-card p-6 rounded-2xl shadow-xl w-full max-w-sm border border-border" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-destructive/10 text-destructive">
+                  <Trash2 size={20} />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">
+                  {selectedDoors.length === 1 ? t('ui_bulk_delete_door') : t('ui_bulk_delete_doors')}
+                </h3>
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Excluir Portas</h3>
-            </div>
-            
-            <p className="text-sm text-muted-foreground mb-6">
-              Tem certeza que deseja excluir as {selectedDoors.length} portas selecionadas? Esta ação não poderá ser desfeita.
-            </p>
-            
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-border hover:bg-muted text-foreground transition-colors"
-                onClick={() => setConfirmDelete(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                className="px-4 py-2 text-sm font-medium rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
-                onClick={() => {
-                  fetchNui('deleteDoorsBulk', selectedDoors);
-                  clearSelection();
-                  setConfirmDelete(false);
-                }}
-              >
-                Excluir
-              </button>
-            </div>
+              
+              <p className="text-sm text-muted-foreground mb-6">
+                {t('ui_bulk_delete_confirm')?.replace('{{count}}', selectedDoors.length.toString())}
+              </p>
+                        <div className="flex justify-end gap-3">
+                <button
+                  className="px-4 py-2 bg-muted hover:bg-muted/80 text-foreground rounded-lg text-sm font-medium transition-colors"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  {t('ui_btn_cancel')}
+                </button>
+                <button
+                  className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg text-sm font-medium transition-colors shadow-lg shadow-destructive/20"
+                  onClick={() => {
+                    fetchNui('deleteDoorsBulk', selectedDoors);
+                    clearSelection();
+                    setConfirmDelete(false);
+                  }}
+                >
+                  {t('ui_btn_delete')}
+                </button>
+              </div>
           </div>
         </>
       )}

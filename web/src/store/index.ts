@@ -17,7 +17,7 @@ export interface StoreState {
   doorRate: NumberField;
   lockSound: StringField;
   unlockSound: StringField;
-  lockpickDifficulty: Array<string | { areaSize: number; speedMultiplier: number }>;
+  lockpickDifficulty: Array<string | { areaSize: number; speedMultiplier: number; stages?: number } | { difficulty: number; pins: number } | any>;
   auto: boolean | null;
   state: boolean | null;
   lockpick: boolean | null;
@@ -26,6 +26,8 @@ export interface StoreState {
   holdOpen: boolean | null;
   doorGroupId?: number | null;
   isBulkEdit?: boolean;
+  hasT3Lockpick?: boolean;
+  lockpickSystem?: 'ox_lib' | 't3_lockpick';
 }
 
 interface StateSetters {
@@ -45,6 +47,8 @@ interface StateSetters {
   toggleCheckbox: (type: 'state' | 'doors' | 'auto' | 'lockpick' | 'hideUi' | 'holdOpen') => void;
   setMaxDistance: (value: StoreState['maxDistance']) => void;
   setDoorRate: (value: StoreState['doorRate']) => void;
+  setHasT3Lockpick: (value: boolean) => void;
+  setLockpickSystem: (value: 'ox_lib' | 't3_lockpick') => void;
 }
 
 export const useStore = create<StoreState>(() => ({
@@ -69,6 +73,8 @@ export const useStore = create<StoreState>(() => ({
   holdOpen: false,
   isBulkEdit: false,
   doorGroupId: null,
+  hasT3Lockpick: false,
+  lockpickSystem: 'ox_lib',
 }));
 
 export const defaultState = useStore.getState();
@@ -102,4 +108,6 @@ export const useSetters = create<StateSetters>((set: SetState<StateSetters>, get
       lockpickDifficulty: fn(difficultyFields),
     })),
   setDoorRate: (value: StoreState['doorRate']) => useStore.setState({ doorRate: value }),
+  setHasT3Lockpick: (value) => useStore.setState({ hasT3Lockpick: value }),
+  setLockpickSystem: (value) => useStore.setState({ lockpickSystem: value }),
 }));
