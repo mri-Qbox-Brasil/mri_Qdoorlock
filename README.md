@@ -4,7 +4,7 @@ An advanced, highly optimized, and robust doorlock system for FiveM, heavily bas
 
 ## 🌟 Key Features
 
-- **Automatic SQL Installation**: No more manual database imports! The script automatically detects if the database exists and installs the necessary tables on the first server startup.
+- **Automatic SQL Installation & Migration**: No more manual database imports! The script automatically detects if the tables exist and installs them on the first server startup. Furthermore, it intelligently detects if you have an existing `ox_doorlock` database table, securely migrating all your old doors to the new `mri_Qdoorlock` structure without losing any data.
 - **Door Groups System**: Manage doors efficiently by assigning them to groups (zones/departments like MRPD, Pillbox, etc). Deleting a group cascades and cleanly deletes all associated doors.
 - **Modern Management UI**: Built with **React 18**, **Vite**, **Zustand**, and **TailwindCSS**. Manage your doors, passcodes, permissions, and lockpick settings visually in-game.
 - **Editable UI Source Code**: The `web/` folder contains all the source code. Developers can modify the UI, add new features, and rebuild it using `npm run build`.
