@@ -110,7 +110,8 @@ exports('editDoor', function(id, data)
 			end
 		end
 
-		MySQL.update('UPDATE mri_qdoorlock SET name = ?, data = ?, group_id = ? WHERE id = ?', { door.name, encodeData(door), door.doorGroupId, id })
+		MySQL.update('UPDATE mri_qdoorlock SET name = @name, data = @data, group_id = @group_id WHERE id = @id',
+			{ ['@name'] = door.name, ['@data'] = encodeData(door), ['@group_id'] = door.doorGroupId, ['@id'] = id })
 		TriggerClientEvent('ox_doorlock:editDoorlock', -1, id, door)
 	end
 end)
@@ -275,26 +276,37 @@ MySQL.ready(function()
 
 	if isFirstInstall then
 		print("^2[mri_Qdoorlock] Database installation completed successfully!^0")
+	end
 		
-		-- Integração / Migração Automática do ox_doorlock
+	-- Integração / Migração Automática do ox_doorlock (Executa se a tabela mri_qdoorlock estiver vazia)
+	local doorCount = MySQL.scalar.await('SELECT COUNT(*) FROM `mri_qdoorlock`')
+	if doorCount == 0 then
 		local oxTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock'")
 		if oxTables and #oxTables > 0 then
-			print("^3[mri_Qdoorlock] ox_doorlock database detected! Starting automatic migration...^0")
-			
-			local oxGroupsTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock_groups'")
-			if oxGroupsTables and #oxGroupsTables > 0 then
-				MySQL.query.await([[
-					INSERT IGNORE INTO `mri_qdoorlock_groups` (`id`, `name`, `coords`)
-					SELECT `id`, `name`, `coords` FROM `ox_doorlock_groups`
-				]])
-			end
+			local oxDoorCount = MySQL.scalar.await('SELECT COUNT(*) FROM `ox_doorlock`')
+			if oxDoorCount > 0 then
+				print("^3[mri_Qdoorlock] ox_doorlock database detected and mri_qdoorlock is empty! Starting automatic migration...^0")
+				
+				local oxGroupsTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock_groups'")
+				if oxGroupsTables and #oxGroupsTables > 0 then
+					MySQL.query.await([[
+						INSERT IGNORE INTO `mri_qdoorlock_groups` (`id`, `name`, `coords`)
+						SELECT `id`, `name`, `coords` FROM `ox_doorlock_groups`
+					]])
 
-			MySQL.query.await([[
-				INSERT IGNORE INTO `mri_qdoorlock` (`id`, `name`, `data`)
-				SELECT `id`, `name`, `data` FROM `ox_doorlock`
-			]])
-			
-			print("^2[mri_Qdoorlock] Migration completed! All doors and groups from ox_doorlock have been copied.^0")
+					MySQL.query.await([[
+						INSERT IGNORE INTO `mri_qdoorlock` (`id`, `name`, `data`, `group_id`)
+						SELECT `id`, `name`, `data`, `group_id` FROM `ox_doorlock`
+					]])
+				else
+					MySQL.query.await([[
+						INSERT IGNORE INTO `mri_qdoorlock` (`id`, `name`, `data`)
+						SELECT `id`, `name`, `data` FROM `ox_doorlock`
+					]])
+				end
+				
+				print("^2[mri_Qdoorlock] Migration completed! All doors and groups from ox_doorlock have been copied.^0")
+			end
 		end
 	end
 
@@ -400,8 +412,8 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 
 		if id then
 			if data then
-				MySQL.update('UPDATE mri_qdoorlock SET name = ?, data = ?, group_id = ? WHERE id = ?',
-					{ data.name, encodeData(data), data.doorGroupId, id })
+				MySQL.update('UPDATE mri_qdoorlock SET name = @name, data = @data, group_id = @group_id WHERE id = @id',
+					{ ['@name'] = data.name, ['@data'] = encodeData(data), ['@group_id'] = data.doorGroupId, ['@id'] = id })
 				data = createDoor(id, data, data.name)
 			else
 				MySQL.update('DELETE FROM mri_qdoorlock WHERE id = ?', { id })
@@ -410,8 +422,8 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 
 			TriggerClientEvent('ox_doorlock:editDoorlock', -1, id, data)
 		else
-			local insertId = MySQL.insert.await('INSERT INTO mri_qdoorlock (name, data, group_id) VALUES (?, ?, ?)',
-				{ data.name, encodeData(data), data.doorGroupId })
+			local insertId = MySQL.insert.await('INSERT INTO mri_qdoorlock (name, data, group_id) VALUES (@name, @data, @group_id)',
+				{ ['@name'] = data.name, ['@data'] = encodeData(data), ['@group_id'] = data.doorGroupId })
 			local door = createDoor(insertId, data, data.name)
 
 			TriggerClientEvent('ox_doorlock:setState', -1, door.id, door.state, false, door)
