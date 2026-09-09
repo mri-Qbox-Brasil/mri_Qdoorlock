@@ -36,3 +36,6 @@ Config.LockpickItems = {
 
 ---Play sounds using game audio (sound natives) instead of through NUI.
 Config.NativeAudio = true
+
+---Minimum delay (ms) between failed passcode attempts, per player, to throttle brute-forcing.
+Config.PasscodeCooldown = 2000

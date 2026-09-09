@@ -12,6 +12,40 @@ require 'server.convert'
 local utils = require 'server.utils'
 local doors = {}
 local groups = {}
+local passcodeCooldowns = {}
+
+-- Returns a copy of the door without the real passcode. Regular players only need
+-- to know whether a passcode exists (hasPasscode) — the value stays server-side so
+-- it can't be read out of the client-side `doors` table.
+local function sanitizeDoor(door)
+	if not door or not door.passcode then return door end
+
+	local copy = {}
+	for k, v in pairs(door) do copy[k] = v end
+	copy.passcode = nil
+	copy.hasPasscode = true
+	return copy
+end
+
+-- Broadcasts door data, sending the real passcode only to players allowed to manage
+-- doors (they need it to edit). Everyone else receives the sanitized version.
+local function broadcastDoorData(sendFull, sendSafe, door)
+	if not door or not door.passcode then
+		return sendFull(-1)
+	end
+
+	local safe = sanitizeDoor(door)
+
+	for _, pid in ipairs(GetPlayers()) do
+		local target = tonumber(pid)
+
+		if IsPlayerAceAllowed(target, 'command.doorlock') then
+			sendFull(target)
+		else
+			sendSafe(target, safe)
+		end
+	end
+end
 
 
 local function encodeData(door)
@@ -111,7 +145,10 @@ exports('editDoor', function(id, data)
 		end
 
 		MySQL.update('UPDATE mri_qdoorlock SET name = ?, data = ?, group_id = ? WHERE id = ?', { door.name, encodeData(door), door.doorGroupId, id })
-		TriggerClientEvent('ox_doorlock:editDoorlock', -1, id, door)
+		broadcastDoorData(
+			function(target) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, door) end,
+			function(target, safe) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, safe) end,
+			door)
 	end
 end)
 
@@ -247,7 +284,21 @@ local function isAuthorised(playerId, door, lockpick, state)
 			if state == 1 then
 				authorised = true
 			else
+				-- Throttle passcode attempts to prevent brute-forcing.
+				local now = GetGameTimer()
+				local readyAt = passcodeCooldowns[playerId]
+
+				if readyAt and now < readyAt then
+					return false
+				end
+
 				authorised = door.passcode == lib.callback.await('ox_doorlock:inputPassCode', playerId)
+
+				if authorised then
+					passcodeCooldowns[playerId] = nil
+				else
+					passcodeCooldowns[playerId] = now + (Config.PasscodeCooldown or 2000)
+				end
 			end
 		end
 	end
@@ -343,8 +394,13 @@ local function setDoorState(id, state, lockpick)
 			TriggerClientEvent('ox_doorlock:setState', -1, id, state, source)
 
 			if door.autolock and state == 0 then
+				-- Only the most recent unlock's timer should re-lock the door, otherwise
+				-- unlocking repeatedly stacks timers that all fire.
+				door.autolockToken = (door.autolockToken or 0) + 1
+				local token = door.autolockToken
+
 				SetTimeout(door.autolock * 1000, function()
-					if door.state ~= 1 then
+					if door.autolockToken == token and door.state ~= 1 then
 						door.state = 1
 
 						TriggerClientEvent('ox_doorlock:setState', -1, id, door.state)
@@ -371,10 +427,23 @@ end
 RegisterNetEvent('ox_doorlock:setState', setDoorState)
 exports('setDoorState', setDoorState)
 
-lib.callback.register('ox_doorlock:getDoors', function()
+AddEventHandler('playerDropped', function()
+	passcodeCooldowns[source] = nil
+end)
+
+lib.callback.register('ox_doorlock:getDoors', function(source)
 	while not isLoaded do Wait(100) end
 
-	return doors, sounds, groups
+	if IsPlayerAceAllowed(source, 'command.doorlock') then
+		return doors, sounds, groups
+	end
+
+	local safe = {}
+	for id, door in pairs(doors) do
+		safe[id] = sanitizeDoor(door)
+	end
+
+	return safe, sounds, groups
 end)
 
 RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
@@ -408,13 +477,19 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 				doors[id] = nil
 			end
 
-			TriggerClientEvent('ox_doorlock:editDoorlock', -1, id, data)
+			broadcastDoorData(
+				function(target) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, data) end,
+				function(target, safe) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, safe) end,
+				data)
 		else
 			local insertId = MySQL.insert.await('INSERT INTO mri_qdoorlock (name, data, group_id) VALUES (?, ?, ?)',
 				{ data.name, encodeData(data), data.doorGroupId })
 			local door = createDoor(insertId, data, data.name)
 
-			TriggerClientEvent('ox_doorlock:setState', -1, door.id, door.state, false, door)
+			broadcastDoorData(
+				function(target) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, door) end,
+				function(target, safe) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, safe) end,
+				door)
 		end
 	end
 end)
@@ -496,6 +571,12 @@ CreateThread(function()
     end
     registerPlugin()
 end)
+
+-- Sinal oficial do Qadmin: emitido sempre que o registry dele fica pronto.
+-- Complementa o onResourceStart abaixo, que depende do timing do start; este
+-- dispara quando o registry esta de fato aceitando plugins. RegisterPlugin e
+-- idempotente por `id`, entao os dois caminhos juntos sao seguros.
+AddEventHandler('mri_Qadmin:server:pluginsReady', registerPlugin)
 
 AddEventHandler('onResourceStart', function(resourceName)
     if resourceName == 'mri_Qadmin' then

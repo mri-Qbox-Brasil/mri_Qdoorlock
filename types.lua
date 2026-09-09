@@ -20,4 +20,5 @@
 ---@field CanPickUnlockedDoors boolean
 ---@field LockpickItems string[]
 ---@field NativeAudio boolean
+---@field PasscodeCooldown? number
 ---@field DrawSprite { [0]: DrawSpriteProps, [1]: DrawSpriteProps }

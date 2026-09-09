@@ -393,8 +393,9 @@ RegisterNUICallback('teleportToDoor', function(id, cb)
 	cb(1)
 	SetNuiFocus(false, false)
 	ClearTimecycleModifier()
-	local doorCoords = doors[id].coords
-	if not doorCoords then return end
+	local door = doors[id]
+	if not door or not door.coords then return end
+	local doorCoords = door.coords
 	SetEntityCoords(cache.ped, doorCoords.x, doorCoords.y, doorCoords.z, false, false, false, false)
 end)
 

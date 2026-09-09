@@ -158,6 +158,8 @@ RegisterNetEvent('ox_doorlock:setState', function(id, state, source, data)
 	end
 
 	local door = data or doors[id]
+	if not door then return end
+
 	local double = door.doors
 	door.state = state
 
@@ -264,7 +266,7 @@ RegisterNUICallback('submitPasscode', function(passcode, cb)
 end)
 
 lib.callback.register('ox_doorlock:inputPassCode', function()
-	if not ClosestDoor?.passcode then return end
+	if not (ClosestDoor?.passcode or ClosestDoor?.hasPasscode) then return end
 	
 	passcodePromise = promise.new()
 	SetNuiFocus(true, true)
