@@ -1,13 +1,12 @@
 if not LoadResourceFile(cache.resource, 'web/build/index.html') then
-	error(
-		'Unable to load UI. Build ox_doorlock or download the latest release.\n	^3https://github.com/overextended/ox_doorlock/releases/latest/download/ox_doorlock.zip^0')
+	error('Unable to load UI. Build the web folder or download the latest mri_Qdoorlock release.\n	^3https://github.com/mri-Qbox-Brasil/mri_Qdoorlock/releases/latest^0')
 end
 
 if not lib.checkDependency('oxmysql', '2.4.0') then return end
 if not lib.checkDependency('ox_lib', '3.30.4') then return end
 
 -- lib.versionCheck('overextended/ox_doorlock')
-require 'server.convert'
+local TriggerEventHooks = require 'server.hooks'
 
 local utils = require 'server.utils'
 local doors = {}
@@ -144,7 +143,7 @@ exports('editDoor', function(id, data)
 			end
 		end
 
-		MySQL.update('UPDATE mri_qdoorlock SET name = ?, data = ?, group_id = ? WHERE id = ?', { door.name, encodeData(door), door.doorGroupId, id })
+		MySQL.update('UPDATE ox_doorlock SET name = ?, data = ?, group_id = ? WHERE id = ?', { door.name, encodeData(door), door.doorGroupId, id })
 		broadcastDoorData(
 			function(target) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, door) end,
 			function(target, safe) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, safe) end,
@@ -199,12 +198,61 @@ local function createDoor(id, door, name)
 		end
 
 		door.items = items
-		MySQL.update('UPDATE mri_qdoorlock SET data = ? WHERE id = ?', { encodeData(door), id })
+		MySQL.update('UPDATE ox_doorlock SET data = ? WHERE id = ?', { encodeData(door), id })
 	end
 
 	doors[id] = door
 	return door
 end
+
+exports('createDoor', function(data)
+	if type(data) ~= 'table' then
+		error('Expected table for door data')
+	end
+
+	if not data.coords then
+		local double = data.doors
+
+		if not double then
+			error('Door data requires coords or doors')
+		end
+
+		data.coords = double[1].coords - ((double[1].coords - double[2].coords) / 2)
+	end
+
+	if not data.name then
+		data.name = tostring(data.coords)
+	end
+
+	local insertId = MySQL.insert.await('INSERT INTO ox_doorlock (name, data, group_id) VALUES (?, ?, ?)',
+		{ data.name, encodeData(data), data.doorGroupId })
+	local door = createDoor(insertId, data, data.name)
+
+	broadcastDoorData(
+		function(target) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, door) end,
+		function(target, safe) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, safe) end,
+		door)
+
+	return door.id
+end)
+
+local function removeDoor(id)
+	if not doors[id] then return false end
+
+	MySQL.update('DELETE FROM ox_doorlock WHERE id = ?', { id })
+	doors[id] = nil
+	TriggerClientEvent('ox_doorlock:editDoorlock', -1, id, nil)
+
+	return true
+end
+
+exports('removeDoor', function(id)
+	if not doors[id] then
+		error(('No door found with id %s'):format(id))
+	end
+
+	return removeDoor(id)
+end)
 
 local isLoaded = false
 local ox_inventory = exports.ox_inventory
@@ -279,81 +327,136 @@ local function isAuthorised(playerId, door, lockpick, state)
 		if not authorised and door.items then
 			authorised = DoesPlayerHaveItem(player, door.items) or nil
 		end
+	end
 
-		if authorised ~= nil and door.passcode then
-			if state == 1 then
-				authorised = true
+	if authorised ~= nil and door.passcode then
+		if state == 1 then
+			authorised = true
+		else
+			-- Throttle passcode attempts to prevent brute-forcing.
+			local now = GetGameTimer()
+			local readyAt = passcodeCooldowns[playerId]
+
+			if readyAt and now < readyAt then
+				return false
+			end
+
+			authorised = door.passcode == lib.callback.await('ox_doorlock:inputPassCode', playerId)
+
+			if authorised then
+				passcodeCooldowns[playerId] = nil
 			else
-				-- Throttle passcode attempts to prevent brute-forcing.
-				local now = GetGameTimer()
-				local readyAt = passcodeCooldowns[playerId]
-
-				if readyAt and now < readyAt then
-					return false
-				end
-
-				authorised = door.passcode == lib.callback.await('ox_doorlock:inputPassCode', playerId)
-
-				if authorised then
-					passcodeCooldowns[playerId] = nil
-				else
-					passcodeCooldowns[playerId] = now + (Config.PasscodeCooldown or 2000)
-				end
+				passcodeCooldowns[playerId] = now + (Config.PasscodeCooldown or 2000)
 			end
 		end
+	end
+
+	local hookResult = TriggerEventHooks('doorAuthorization', {
+		source = playerId,
+		door = door,
+		lockpick = lockpick,
+		state = state,
+		authorised = authorised,
+	})
+
+	if hookResult ~= nil then
+		return authorised or hookResult
 	end
 
 	return authorised
 end
 
-local sql = LoadResourceFile(cache.resource, 'sql/mri_Qdoorlock.sql')
+local sql = LoadResourceFile(cache.resource, 'sql/ox_doorlock.sql')
 
-MySQL.ready(function()
-	local tables = MySQL.query.await("SHOW TABLES LIKE 'mri_qdoorlock'")
-	local isFirstInstall = not tables or #tables == 0
+local function tableExists(name)
+	local count = MySQL.scalar.await(
+		'SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?',
+		{ name })
+	return (count or 0) > 0
+end
 
-	if isFirstInstall then
-		print("^2[mri_Qdoorlock] Installing database tables for the first time...^0")
+local function columnExists(tableName, column)
+	local count = MySQL.scalar.await(
+		'SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+		{ tableName, column })
+	return (count or 0) > 0
+end
+
+local function foreignKeyExists(tableName, column)
+	local count = MySQL.scalar.await(
+		'SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL',
+		{ tableName, column })
+	return (count or 0) > 0
+end
+
+local function installSchema()
+	local firstInstall = not tableExists('ox_doorlock')
+
+	if firstInstall then
+		print('^2[mri_Qdoorlock] Installing database tables for the first time...^0')
 	end
 
 	if sql then
-		for query in string.gmatch(sql, "([^;]+)") do
-			if query:match("%S") then
+		for query in string.gmatch(sql, '([^;]+)') do
+			if query:match('%S') then
 				MySQL.query.await(query)
 			end
 		end
 	end
 
-	if isFirstInstall then
-		print("^2[mri_Qdoorlock] Database installation completed successfully!^0")
-		
-		-- Integração / Migração Automática do ox_doorlock
-		local oxTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock'")
-		if oxTables and #oxTables > 0 then
-			print("^3[mri_Qdoorlock] ox_doorlock database detected! Starting automatic migration...^0")
-			
-			local oxGroupsTables = MySQL.query.await("SHOW TABLES LIKE 'ox_doorlock_groups'")
-			if oxGroupsTables and #oxGroupsTables > 0 then
-				MySQL.query.await([[
-					INSERT IGNORE INTO `mri_qdoorlock_groups` (`id`, `name`, `coords`)
-					SELECT `id`, `name`, `coords` FROM `ox_doorlock_groups`
-				]])
-			end
-
-			MySQL.query.await([[
-				INSERT IGNORE INTO `mri_qdoorlock` (`id`, `name`, `data`)
-				SELECT `id`, `name`, `data` FROM `ox_doorlock`
-			]])
-			
-			print("^2[mri_Qdoorlock] Migration completed! All doors and groups from ox_doorlock have been copied.^0")
-		end
+	if not columnExists('ox_doorlock', 'group_id') then
+		print('^3[mri_Qdoorlock] Existing ox_doorlock table found, adding the group_id column...^0')
+		MySQL.query.await('ALTER TABLE `ox_doorlock` ADD COLUMN `group_id` int(11) unsigned DEFAULT NULL, ADD KEY `fk_ox_doorlock_group` (`group_id`)')
 	end
 
+	if not foreignKeyExists('ox_doorlock', 'group_id') then
+		MySQL.query.await('ALTER TABLE `ox_doorlock` ADD CONSTRAINT `fk_ox_doorlock_group` FOREIGN KEY (`group_id`) REFERENCES `ox_doorlock_groups` (`id`) ON DELETE CASCADE')
+	end
 
-	while Config.DoorList do Wait(100) end
+	if firstInstall then
+		print('^2[mri_Qdoorlock] Database installation completed successfully!^0')
+	end
+end
 
-	local response = MySQL.query.await('SELECT `id`, `name`, `data`, `group_id` FROM `mri_qdoorlock`')
-	local groupsResponse = MySQL.query.await('SELECT `id`, `name`, `coords` FROM `mri_qdoorlock_groups`')
+local function migrateLegacyTables()
+	if not tableExists('mri_qdoorlock') then return end
+
+	print('^3[mri_Qdoorlock] Legacy mri_qdoorlock tables found, moving doors and groups into ox_doorlock...^0')
+
+	local hasGroups = tableExists('mri_qdoorlock_groups')
+
+	if hasGroups then
+		MySQL.query.await([[
+			INSERT INTO `ox_doorlock_groups` (`id`, `name`, `coords`)
+			SELECT `id`, `name`, `coords` FROM `mri_qdoorlock_groups`
+			ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `coords` = VALUES(`coords`)
+		]])
+	end
+
+	MySQL.query.await([[
+		INSERT INTO `ox_doorlock` (`id`, `name`, `data`, `group_id`)
+		SELECT `id`, `name`, `data`, `group_id` FROM `mri_qdoorlock`
+		ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `data` = VALUES(`data`), `group_id` = VALUES(`group_id`)
+	]])
+
+	local suffix = tableExists('mri_qdoorlock_migrated') and ('_migrated_%s'):format(os.time()) or '_migrated'
+	local renames = { ('`mri_qdoorlock` TO `mri_qdoorlock%s`'):format(suffix) }
+
+	if hasGroups then
+		renames[#renames + 1] = ('`mri_qdoorlock_groups` TO `mri_qdoorlock_groups%s`'):format(suffix)
+	end
+
+	MySQL.query.await('RENAME TABLE ' .. table.concat(renames, ', '))
+
+	print(('^2[mri_Qdoorlock] Migration completed! Old tables kept as mri_qdoorlock%s for backup.^0'):format(suffix))
+end
+
+MySQL.ready(function()
+	installSchema()
+	migrateLegacyTables()
+
+	local response = MySQL.query.await('SELECT `id`, `name`, `data`, `group_id` FROM `ox_doorlock`')
+	local groupsResponse = MySQL.query.await('SELECT `id`, `name`, `coords` FROM `ox_doorlock_groups`')
 
 	if groupsResponse then
 		for i = 1, #groupsResponse do
@@ -469,11 +572,11 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 
 		if id then
 			if data then
-				MySQL.update('UPDATE mri_qdoorlock SET name = ?, data = ?, group_id = ? WHERE id = ?',
+				MySQL.update('UPDATE ox_doorlock SET name = ?, data = ?, group_id = ? WHERE id = ?',
 					{ data.name, encodeData(data), data.doorGroupId, id })
 				data = createDoor(id, data, data.name)
 			else
-				MySQL.update('DELETE FROM mri_qdoorlock WHERE id = ?', { id })
+				MySQL.update('DELETE FROM ox_doorlock WHERE id = ?', { id })
 				doors[id] = nil
 			end
 
@@ -482,7 +585,7 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 				function(target, safe) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, safe) end,
 				data)
 		else
-			local insertId = MySQL.insert.await('INSERT INTO mri_qdoorlock (name, data, group_id) VALUES (?, ?, ?)',
+			local insertId = MySQL.insert.await('INSERT INTO ox_doorlock (name, data, group_id) VALUES (?, ?, ?)',
 				{ data.name, encodeData(data), data.doorGroupId })
 			local door = createDoor(insertId, data, data.name)
 
@@ -497,6 +600,35 @@ end)
 RegisterNetEvent('ox_doorlock:breakLockpick', function()
 	local player = GetPlayer(source)
 	return player and DoesPlayerHaveItem(player, Config.LockpickItems, true)
+end)
+
+RegisterNetEvent('ox_doorlock:RemoveDoorlock', function(name)
+	local source = source
+
+	if source and source ~= '' and source ~= 0 and not IsPlayerAceAllowed(source, 'command.doorlock') then return end
+	if type(name) ~= 'string' or name == '' then return end
+
+	local prefix = name .. '_'
+
+	for id, door in pairs(doors) do
+		if door.name == name or door.name:sub(1, #prefix) == prefix then
+			removeDoor(id)
+		end
+	end
+end)
+
+local function teleportPlayer(playerId, coords)
+	if not coords or not IsPlayerAceAllowed(playerId, 'command.doorlock') then return end
+
+	SetEntityCoords(GetPlayerPed(playerId), coords.x, coords.y, coords.z, false, false, false, false)
+end
+
+RegisterNetEvent('ox_doorlock:teleportToDoor', function(id)
+	teleportPlayer(source, doors[tonumber(id) or id]?.coords)
+end)
+
+RegisterNetEvent('ox_doorlock:teleportToGroup', function(id)
+	teleportPlayer(source, groups[tonumber(id) or id]?.coords)
 end)
 
 lib.addCommand('doorlock', {
@@ -521,11 +653,11 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 		id = tonumber(id) or id
 		if data then
 			data.id = id
-			MySQL.update('UPDATE mri_qdoorlock_groups SET name = ?, coords = ? WHERE id = ?',
+			MySQL.update('UPDATE ox_doorlock_groups SET name = ?, coords = ? WHERE id = ?',
 				{ data.name, json.encode(data.coords), id })
 			groups[id] = data
 		else
-			MySQL.update('DELETE FROM mri_qdoorlock_groups WHERE id = ?', { id })
+			MySQL.update('DELETE FROM ox_doorlock_groups WHERE id = ?', { id })
 			groups[id] = nil
 			-- Delete all doors in this group
 			for doorId, door in pairs(doors) do
@@ -536,7 +668,7 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 			end
 		end
 	else
-		local insertId = MySQL.insert.await('INSERT INTO mri_qdoorlock_groups (name, coords) VALUES (?, ?)',
+		local insertId = MySQL.insert.await('INSERT INTO ox_doorlock_groups (name, coords) VALUES (?, ?)',
 			{ data.name, json.encode(data.coords) })
 		id = insertId
 		data.id = insertId
@@ -544,43 +676,4 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 	end
 
 	TriggerClientEvent('ox_doorlock:updateGroup', -1, id, data)
-end)
-
-local function registerPlugin()
-    if GetResourceState('mri_Qadmin') ~= 'started' then return end
-    local ok, result = pcall(function()
-        return exports['mri_Qadmin']:RegisterPlugin({
-            id = 'doorlock',
-            label = 'Portas',
-            icon = 'door-closed',
-            resource = 'mri_Qdoorlock',
-            htmlPath = 'web/build/index.html',
-            requiredPerms = { 'command.doorlock' },
-            description = 'Gerenciamento de portas e acessos do servidor',
-        })
-    end)
-    if not ok or result == false then
-        print(('[mri_Qdoorlock] Failed to register plugin in mri_Qadmin: %s'):format(tostring(result)))
-    end
-end
-
-CreateThread(function()
-    local deadline = GetGameTimer() + 10000
-    while GetResourceState('mri_Qadmin') ~= 'started' and GetGameTimer() < deadline do
-        Wait(200)
-    end
-    registerPlugin()
-end)
-
--- Sinal oficial do Qadmin: emitido sempre que o registry dele fica pronto.
--- Complementa o onResourceStart abaixo, que depende do timing do start; este
--- dispara quando o registry esta de fato aceitando plugins. RegisterPlugin e
--- idempotente por `id`, entao os dois caminhos juntos sao seguros.
-AddEventHandler('mri_Qadmin:server:pluginsReady', registerPlugin)
-
-AddEventHandler('onResourceStart', function(resourceName)
-    if resourceName == 'mri_Qadmin' then
-        Wait(500)
-        registerPlugin()
-    end
 end)

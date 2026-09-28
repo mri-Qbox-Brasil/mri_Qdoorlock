@@ -6,15 +6,17 @@ game         'gta5'
 
 --[[ Resource Information ]]--
 name         'mri_Qdoorlock'
-version      '1.21.0'
+version      '1.22.0'
 license      'GPL-3.0-or-later'
 author       'MRI Qbox Brasil (baseado em ox_doorlock da Overextended)'
 repository   'https://github.com/mri-Qbox-Brasil/mri_Qdoorlock'
+provide      'ox_doorlock'
 
 --[[ Manifest ]]--
 shared_scripts {
 	'@ox_lib/init.lua',
 	'config.lua',
+	'mri/compat.lua',
 }
 
 client_scripts {
@@ -25,6 +27,7 @@ client_scripts {
 server_scripts {
 	'@oxmysql/lib/MySQL.lua',
 	'server/main.lua',
+	'mri/server.lua',
 }
 
 ui_page 'web/build/index.html?v=2'

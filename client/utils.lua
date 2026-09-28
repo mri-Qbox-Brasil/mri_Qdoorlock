@@ -393,19 +393,14 @@ RegisterNUICallback('teleportToDoor', function(id, cb)
 	cb(1)
 	SetNuiFocus(false, false)
 	ClearTimecycleModifier()
-	local door = doors[id]
-	if not door or not door.coords then return end
-	local doorCoords = door.coords
-	SetEntityCoords(cache.ped, doorCoords.x, doorCoords.y, doorCoords.z, false, false, false, false)
+	TriggerServerEvent('ox_doorlock:teleportToDoor', id)
 end)
 
 RegisterNUICallback('teleportToGroup', function(id, cb)
 	cb(1)
 	SetNuiFocus(false, false)
 	ClearTimecycleModifier()
-	local group = doorGroups[id]
-	if not group or not group.coords then return end
-	SetEntityCoords(cache.ped, group.coords.x, group.coords.y, group.coords.z, false, false, false, false)
+	TriggerServerEvent('ox_doorlock:teleportToGroup', id)
 end)
 
 local function ClearOutlines()
