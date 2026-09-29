@@ -176,7 +176,7 @@ local function handleCreateDoor(data)
 		-- Helper: raycast first, fall back to object proximity scan for doors
 		-- with no raycast-detectable collision (e.g. DoorSystem-managed grates)
 		local function getTargetEntity()
-			local hit, ent, coord = lib.raycast.cam(-1, cache.ped)
+			local hit, ent, coord = lib.raycast.fromCamera(1|16)
 			local entType = hit and ent and GetEntityType(ent) or 0
 			-- If raycast found a valid prop entity, return it directly
 			if hit and ent > 0 and entType == 3 then
@@ -444,7 +444,7 @@ local rayEntity = 0
 Citizen.CreateThread(function()
 	while true do
 		if debugGroupId then
-			local hit, ent = lib.raycast.cam(1|16, PlayerPedId(), 80.0)
+			local hit, ent = lib.raycast.fromCamera(1|16, 4, 80.0)
 			rayEntity = hit and ent or 0
 			Wait(50)
 		else
@@ -689,10 +689,6 @@ function openUi(id)
 		action = 'setVisible',
 		data = id
 	}))
-	SendNUIMessage({
-		action = 'updateAccentColor',
-		color = GetConvar('mri:color', '#00E699')
-	})
 end
 
 RegisterNUICallback('requestData', function(_, cb)
@@ -813,11 +809,31 @@ CreateThread(function()
 	end
 end)
 
-AddConvarChangeListener('mri:color', function(name)
-	if name == 'mri:color' then
-		SendNUIMessage({
-			action = 'updateAccentColor',
-			color = GetConvar('mri:color', '#00E699')
-		})
-	end
+-- Tema da suíte MRI (ver mri/README.md). Accent e fundo vêm das convars
+-- mri:color / mri:backgroundColor; o resto (tema, opacidade, fonte, radius,
+-- cores de status) vem do /uiconfig do ox_lib.
+RegisterNUICallback('getConfig', function(_, cb)
+	cb({
+		accentColor = GetConvar('mri:color', '#00E699'),
+		backgroundColor = GetConvar('mri:backgroundColor', ''),
+	})
+end)
+
+RegisterNUICallback('getUiConfig', function(_, cb)
+	if GetResourceState('ox_lib') ~= 'started' then return cb(false) end
+	local ok, cfg = pcall(function() return exports.ox_lib:getUiConfig() end)
+	cb(ok and type(cfg) == 'table' and cfg or false)
+end)
+
+RegisterNetEvent('mri_Qdoorlock:accentColorChanged', function(color)
+	SendNUIMessage({ action = 'updateAccentColor', data = { accentColor = color } })
+end)
+
+RegisterNetEvent('mri_Qdoorlock:backgroundColorChanged', function(color)
+	SendNUIMessage({ action = 'updateBackgroundColor', data = { backgroundColor = color or '' } })
+end)
+
+RegisterNetEvent('ox_lib:uiConfigChanged', function(cfg)
+	if type(cfg) ~= 'table' then return end
+	SendNUIMessage({ action = 'applyUiConfig', data = cfg })
 end)

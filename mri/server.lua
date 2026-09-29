@@ -30,6 +30,22 @@ end)
 -- idempotente por `id`, entao os dois caminhos juntos sao seguros.
 AddEventHandler('mri_Qadmin:server:pluginsReady', registerPlugin)
 
+-- Tema da suíte: repassa as convars de cor aos clients quando mudam, sem
+-- restart. O client leva pra NUI (client/utils.lua).
+AddConvarChangeListener('mri:color', function(name)
+    if name ~= 'mri:color' then return end
+    local color = GetConvar('mri:color', '#00E699')
+    if not color:match('^#%x%x%x%x%x%x$') then return end
+    TriggerClientEvent('mri_Qdoorlock:accentColorChanged', -1, color)
+end)
+
+AddConvarChangeListener('mri:backgroundColor', function(name)
+    if name ~= 'mri:backgroundColor' then return end
+    local color = GetConvar('mri:backgroundColor', '')
+    if color ~= '' and not color:match('^#%x%x%x%x%x%x$') then return end
+    TriggerClientEvent('mri_Qdoorlock:backgroundColorChanged', -1, color)
+end)
+
 AddEventHandler('onResourceStart', function(resourceName)
     if resourceName == 'mri_Qadmin' then
         Wait(500)

@@ -95,7 +95,7 @@ lib.callback('ox_doorlock:getDoors', false, function(data, sounds, groups)
 					local dDoor = double[i]
 
 					if IsModelValid(dDoor.model) then
-						local entity = not dDoor.entity and GetClosestObjectOfType(dDoor.coords.x, dDoor.coords.y, dDoor.coords.z, 1.0, dDoor.model, false, false, false)
+						local entity = dDoor.entity and DoesEntityExist(dDoor.entity) and dDoor.entity or GetClosestObjectOfType(dDoor.coords.x, dDoor.coords.y, dDoor.coords.z, 1.0, dDoor.model, false, false, false)
 
 						if entity and entity ~= 0 then
 							dDoor.entity = entity
@@ -104,7 +104,7 @@ lib.callback('ox_doorlock:getDoors', false, function(data, sounds, groups)
 					end
 				end
 			elseif IsModelValid(door.model) then
-				local entity = not door.entity and GetClosestObjectOfType(door.coords.x, door.coords.y, door.coords.z, 1.0, door.model, false, false, false)
+				local entity = door.entity and DoesEntityExist(door.entity) and door.entity or GetClosestObjectOfType(door.coords.x, door.coords.y, door.coords.z, 1.0, door.model, false, false, false)
 
 				if entity and entity ~= 0 then
 					local dCoords = GetEntityCoords(entity)
