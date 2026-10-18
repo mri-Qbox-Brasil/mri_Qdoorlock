@@ -16,22 +16,45 @@ local function registerPlugin()
     end
 end
 
-CreateThread(function()
-    local deadline = GetGameTimer() + 10000
-    while GetResourceState('mri_Qadmin') ~= 'started' and GetGameTimer() < deadline do
-        Wait(200)
-    end
-    registerPlugin()
-end)
-
--- Sinal oficial do Qadmin: emitido sempre que o registry dele fica pronto.
--- Complementa o onResourceStart abaixo, que depende do timing do start; este
--- dispara quando o registry esta de fato aceitando plugins. RegisterPlugin e
--- idempotente por `id`, entao os dois caminhos juntos sao seguros.
+-- Qadmin already up covers our restart; pluginsReady covers Qadmin starting or restarting later.
+registerPlugin()
 AddEventHandler('mri_Qadmin:server:pluginsReady', registerPlugin)
 
--- Tema da suíte: repassa as convars de cor aos clients quando mudam, sem
--- restart. O client leva pra NUI (client/utils.lua).
+local function addGroupOptions(options, groups, kind)
+    for name, group in pairs(type(groups) == 'table' and groups or {}) do
+        local grades = {}
+        for level, grade in pairs(type(group) == 'table' and type(group.grades) == 'table' and group.grades or {}) do
+            grades[#grades + 1] = { value = tonumber(level) or 0, label = type(grade) == 'table' and grade.name or tostring(level) }
+        end
+        table.sort(grades, function(a, b) return a.value < b.value end)
+        options[#options + 1] = { value = name, label = type(group) == 'table' and group.label or name, kind = kind, grades = grades }
+    end
+end
+
+-- Jobs and gangs with their grades, for the door's group picker.
+lib.callback.register('mri_Qdoorlock:server:groupOptions', function(source)
+    if not IsPlayerAceAllowed(source, 'command.doorlock') or GetResourceState('qbx_core') ~= 'started' then return {} end
+    local options = {}
+    addGroupOptions(options, exports.qbx_core:GetJobs(), 'job')
+    addGroupOptions(options, exports.qbx_core:GetGangs(), 'gang')
+    table.sort(options, function(a, b) return tostring(a.label):lower() < tostring(b.label):lower() end)
+    return options
+end)
+
+-- Every character (online or not) by name, for the door's character picker.
+lib.callback.register('mri_Qdoorlock:server:characterOptions', function(source)
+    if not IsPlayerAceAllowed(source, 'command.doorlock') or GetResourceState('qbx_core') ~= 'started' then return {} end
+    local options = {}
+    for _, row in ipairs(MySQL.query.await('SELECT citizenid, charinfo FROM players') or {}) do
+        local ok, info = pcall(json.decode, row.charinfo or '')
+        local name = ok and type(info) == 'table' and ('%s %s'):format(info.firstname or '', info.lastname or ''):match('^%s*(.-)%s*$') or ''
+        options[#options + 1] = { value = row.citizenid, label = name ~= '' and name or row.citizenid }
+    end
+    table.sort(options, function(a, b) return a.label:lower() < b.label:lower() end)
+    return options
+end)
+
+-- Forwards the suite color convars to clients live (client/utils.lua passes them to the NUI).
 AddConvarChangeListener('mri:color', function(name)
     if name ~= 'mri:color' then return end
     local color = GetConvar('mri:color', '#00E699')
@@ -44,11 +67,4 @@ AddConvarChangeListener('mri:backgroundColor', function(name)
     local color = GetConvar('mri:backgroundColor', '')
     if color ~= '' and not color:match('^#%x%x%x%x%x%x$') then return end
     TriggerClientEvent('mri_Qdoorlock:backgroundColorChanged', -1, color)
-end)
-
-AddEventHandler('onResourceStart', function(resourceName)
-    if resourceName == 'mri_Qadmin' then
-        Wait(500)
-        registerPlugin()
-    end
 end)

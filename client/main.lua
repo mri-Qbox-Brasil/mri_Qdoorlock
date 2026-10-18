@@ -297,11 +297,11 @@ CreateThread(function()
 	local lockDoor = locale('lock_door')
 	local unlockDoor = locale('unlock_door')
 	local showUI
-	local drawSprite = Config.DrawSprite
+	local sprites = Config.DrawSprite
 
-	if drawSprite then
-		local sprite1 = drawSprite[0]?[1]
-		local sprite2 = drawSprite[1]?[1]
+	if sprites then
+		local sprite1 = sprites[0]?[1]
+		local sprite2 = sprites[1]?[1]
 
 		if sprite1 then
 			RequestStreamedTextureDict(sprite1, true)
@@ -314,10 +314,11 @@ CreateThread(function()
 
 	local SetDrawOrigin = SetDrawOrigin
 	local ClearDrawOrigin = ClearDrawOrigin
-	local DrawSprite = drawSprite and DrawSprite
+	local DrawSprite = DrawSprite
 
 	while true do
 		ClosestDoor = nearbyDoors[1]
+		local drawSprite = Config.ShowLockIcon and sprites
 
 		if nearbyDoorsCount > 0 then
 			for i = 1, nearbyDoorsCount do

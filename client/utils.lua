@@ -766,45 +766,55 @@ CreateThread(function()
 
 	if not target then return end
 
-	if target.ox then
-		target.exp:addGlobalObject({
-			{
-				name = 'pickDoorlock',
-				label = locale('pick_lock'),
-				icon = 'fas fa-user-lock',
-				onSelect = pickLock,
-				canInteract = canPickLock,
-				items = Config.LockpickItems,
-				anyItem = true,
-				distance = 1
-			}
-		})
-	else
-		local options = {
-			{
-				label = locale('pick_lock'),
-				icon = 'fas fa-user-lock',
-				action = pickLock,
-				canInteract = canPickLock,
-				item = Config.LockpickItems[1],
-				distance = 1
-			}
-		}
-
-		---@cast target table
-
-		if target.qt then
-			target.exp:Object({ options = options })
+	local function addPickTarget()
+		if target.ox then
+			target.exp:addGlobalObject({
+				{
+					name = 'pickDoorlock',
+					label = locale('pick_lock'),
+					icon = 'fas fa-user-lock',
+					onSelect = pickLock,
+					canInteract = canPickLock,
+					items = Config.LockpickItems,
+					anyItem = true,
+					distance = 1
+				}
+			})
+		else
+			target.exp:Object({
+				options = {
+					{
+						label = locale('pick_lock'),
+						icon = 'fas fa-user-lock',
+						action = pickLock,
+						canInteract = canPickLock,
+						item = Config.LockpickItems[1],
+						distance = 1
+					}
+				}
+			})
 		end
+	end
 
-		options = { locale('pick_lock') }
+	local function removePickTarget()
+		if target.ox then
+			target.exp:removeGlobalObject('pickDoorlock')
+		else
+			target.exp:RemoveObject({ locale('pick_lock') })
+		end
+	end
 
+	addPickTarget()
+
+	-- The target keeps the item list it got: rebuild when the panel changes the lockpick items.
+	AddEventHandler('mri_Qdoorlock:client:settingsApplied', function()
+		removePickTarget()
+		addPickTarget()
+	end)
+
+	if target.qt then
 		AddEventHandler('onResourceStop', function(resource)
-			if resource == cache.resource then
-				if target.qt then
-					return target.exp:RemoveObject(options)
-				end
-			end
+			if resource == cache.resource then removePickTarget() end
 		end)
 	end
 end)
@@ -817,6 +827,26 @@ RegisterNUICallback('getConfig', function(_, cb)
 		accentColor = GetConvar('mri:color', '#00E699'),
 		backgroundColor = GetConvar('mri:backgroundColor', ''),
 	})
+end)
+
+RegisterNUICallback('getGroupOptions', function(_, cb)
+	cb(lib.callback.await('mri_Qdoorlock:server:groupOptions', false) or {})
+end)
+
+RegisterNUICallback('getCharacterOptions', function(_, cb)
+	cb(lib.callback.await('mri_Qdoorlock:server:characterOptions', false) or {})
+end)
+
+RegisterNUICallback('getItemOptions', function(_, cb)
+	cb(lib.callback.await('mri_Qdoorlock:server:itemOptions', false) or {})
+end)
+
+RegisterNUICallback('getSettings', function(_, cb)
+	cb(lib.callback.await('mri_Qdoorlock:server:getSettings', false) or false)
+end)
+
+RegisterNUICallback('saveSettings', function(data, cb)
+	cb(lib.callback.await('mri_Qdoorlock:server:saveSettings', false, data?.section, data?.values) == true)
 end)
 
 RegisterNUICallback('getUiConfig', function(_, cb)

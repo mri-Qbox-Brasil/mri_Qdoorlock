@@ -313,6 +313,11 @@ local function isAuthorised(playerId, door, lockpick, state)
 
 	if player then
 		if lockpick then
+			if not door.lockpick or (state == 1 and not Config.CanPickUnlockedDoors) then return false end
+
+			-- Small margin over maxDistance for ped position sync lag.
+			if #(GetEntityCoords(GetPlayerPed(playerId)) - door.coords) > (door.maxDistance or 2.0) + 2.0 then return false end
+
 			return DoesPlayerHaveItem(player, Config.LockpickItems)
 		end
 
@@ -520,7 +525,7 @@ local function setDoorState(id, state, lockpick)
 
 		if source then
 			lib.notify(source,
-				{ type = 'error', icon = 'lock', description = state == 0 and 'cannot_unlock' or 'cannot_lock' })
+				{ type = 'error', icon = 'lock', description = locale(state == 0 and 'cannot_unlock' or 'cannot_lock') })
 		end
 	end
 

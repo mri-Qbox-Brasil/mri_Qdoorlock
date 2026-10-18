@@ -14,6 +14,7 @@
 ---@class DoorlockConfig
 ---@field Notify boolean
 ---@field DrawTextUI boolean
+---@field ShowLockIcon boolean
 ---@field CommandPrincipal string
 ---@field PlayerAceAuthorised boolean
 ---@field LockDifficulty SkillCheckDifficulity | SkillCheckDifficulity[]
