@@ -41,6 +41,25 @@ lib.callback.register('mri_Qdoorlock:server:groupOptions', function(source)
     return options
 end)
 
+-- Job types (leo, ems) with the jobs in each, for the door and door group pickers.
+lib.callback.register('mri_Qdoorlock:server:jobTypeOptions', function(source)
+    if not IsPlayerAceAllowed(source, 'command.doorlock') or GetResourceState('qbx_core') ~= 'started' then return {} end
+    local byType = {}
+    for _, job in pairs(exports.qbx_core:GetJobs() or {}) do
+        if type(job) == 'table' and type(job.type) == 'string' and job.type ~= '' then
+            byType[job.type] = byType[job.type] or {}
+            table.insert(byType[job.type], job.label or job.type)
+        end
+    end
+    local options = {}
+    for jobType, jobs in pairs(byType) do
+        table.sort(jobs)
+        options[#options + 1] = { value = jobType, label = jobType, jobs = jobs }
+    end
+    table.sort(options, function(a, b) return a.value < b.value end)
+    return options
+end)
+
 -- Every character (online or not) by name, for the door's character picker.
 lib.callback.register('mri_Qdoorlock:server:characterOptions', function(source)
     if not IsPlayerAceAllowed(source, 'command.doorlock') or GetResourceState('qbx_core') ~= 'started' then return {} end

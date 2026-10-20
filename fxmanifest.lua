@@ -6,7 +6,7 @@ game         'gta5'
 
 --[[ Resource Information ]]--
 name         'mri_Qdoorlock'
-version      '1.24.0'
+version      '1.25.0'
 license      'GPL-3.0-or-later'
 author       'MRI Qbox Brasil (baseado em ox_doorlock da Overextended)'
 repository   'https://github.com/mri-Qbox-Brasil/mri_Qdoorlock'
@@ -21,6 +21,7 @@ shared_scripts {
 }
 
 client_scripts {
+	'client/picker.lua',
 	'client/main.lua',
 	'client/utils.lua',
 }

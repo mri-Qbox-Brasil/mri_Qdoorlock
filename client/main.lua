@@ -107,14 +107,10 @@ lib.callback('ox_doorlock:getDoors', false, function(data, sounds, groups)
 				local entity = door.entity and DoesEntityExist(door.entity) and door.entity or GetClosestObjectOfType(door.coords.x, door.coords.y, door.coords.z, 1.0, door.model, false, false, false)
 
 				if entity and entity ~= 0 then
-					local dCoords = GetEntityCoords(entity)
-					local min, max = GetModelDimensions(door.model)
-					local center = vec3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2)
-					local heading = GetEntityHeading(entity) * (math.pi / 180)
-					local sin, cos = math.sincos(heading)
-					local rotatedX = cos * center.x - sin * center.y
-					local rotatedY = sin * center.x + cos * center.y
-					door.visualCoords = vec3(dCoords.x + rotatedX, dCoords.y + rotatedY, dCoords.z + center.z)
+					if not door.visualOffset then
+						local min, max = GetModelDimensions(door.model)
+						door.visualOffset = (min + max) / 2
+					end
 					door.entity = entity
 
 					Entity(entity).state.doorId = door.id
@@ -134,10 +130,7 @@ RegisterNetEvent('ox_doorlock:setState', function(id, state, source, data)
 		createDoor(data)
 
 		if NuiHasLoaded then
-			SendNuiMessage(json.encode({
-				action = 'updateDoorData',
-				data = data
-			}))
+			SendNUIMessage({ action = 'updateDoorData', data = DoorForPanel(data) })
 		end
 	end
 
@@ -234,7 +227,6 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 	end
 
 	if data then
-		Wait(500)
 		createDoor(data)
 	else
 		doors[id] = nil
@@ -244,10 +236,7 @@ RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
 	end
 
 	if NuiHasLoaded then
-		SendNuiMessage(json.encode({
-			action = 'updateDoorData',
-			data = data or id
-		}))
+		SendNUIMessage({ action = 'updateDoorData', data = data and DoorForPanel(data) or id })
 	end
 end)
 
@@ -317,15 +306,16 @@ CreateThread(function()
 	local DrawSprite = DrawSprite
 
 	while true do
-		ClosestDoor = nearbyDoors[1]
+		-- Only a door within its own reach counts: a small door next to a wide gate must not hide the gate.
+		ClosestDoor = nil
 		local drawSprite = Config.ShowLockIcon and sprites
 
 		if nearbyDoorsCount > 0 then
 			for i = 1, nearbyDoorsCount do
 				local door = nearbyDoors[i]
 
-				if door.distance < door.maxDistance then
-					if door.distance < ClosestDoor.distance then
+				if door.distance and door.distance < door.maxDistance then
+					if not ClosestDoor or door.distance < ClosestDoor.distance then
 						ClosestDoor = door
 					end
 
@@ -333,7 +323,11 @@ CreateThread(function()
 						local sprite = drawSprite[door.state]
 
 						if sprite then
-							local drawCoords = door.visualCoords or door.coords
+							-- Read from the entity every frame, or the icon lags behind a swinging door.
+							local entity = door.entity
+							local drawCoords = entity and door.visualOffset and DoesEntityExist(entity)
+								and GetOffsetFromEntityInWorldCoords(entity, door.visualOffset.x, door.visualOffset.y, door.visualOffset.z)
+								or door.coords
 							SetDrawOrigin(drawCoords.x, drawCoords.y, drawCoords.z)
 							DrawSprite(sprite[1], sprite[2], sprite[3], sprite[4], sprite[5], sprite[6] * ratio, sprite[7], sprite[8], sprite[9], sprite[10], sprite[11])
 							ClearDrawOrigin()
@@ -343,7 +337,7 @@ CreateThread(function()
 			end
 		end
 
-		if ClosestDoor and ClosestDoor.distance < ClosestDoor.maxDistance then
+		if ClosestDoor and not DoorPicker.isActive() then
 			if Config.DrawTextUI and not ClosestDoor.hideUi and ClosestDoor.state ~= showUI then
 				lib.showTextUI(ClosestDoor.state == 0 and lockDoor or unlockDoor)
 				showUI = ClosestDoor.state
@@ -362,4 +356,5 @@ CreateThread(function()
 end)
 
 exports('useClosestDoor', useClosestDoor)
-exports('getClosestDoor', function() return ClosestDoor end)
+-- Same answer as upstream for other scripts: the nearest door even out of its reach.
+exports('getClosestDoor', function() return ClosestDoor or nearbyDoors[1] end)

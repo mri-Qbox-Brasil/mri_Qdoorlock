@@ -84,6 +84,7 @@ local function encodeData(door)
 		passcodeCoords = door.passcodeCoords,
 		lockpickDifficulty = door.lockpickDifficulty,
 		lockpickSystem = door.lockpickSystem,
+		jobTypes = door.jobTypes,
 		doorGroupId = door.doorGroupId
 	})
 end
@@ -258,10 +259,53 @@ local isLoaded = false
 local ox_inventory = exports.ox_inventory
 
 SetTimeout(0, function()
+	if not GetPlayerJobType then
+		-- Only qbx_core has job types (leo, ems): elsewhere the type rule never matches.
+		function GetPlayerJobType(_) end
+	end
+
 	if GetPlayer then return end
 
 	function GetPlayer(_) end
 end)
+
+--- Job/gang name -> minimum grade, from the panel
+local function cleanGrades(list)
+	if type(list) ~= 'table' then return nil end
+	local out, any = {}, false
+	for name, grade in pairs(list) do
+		if type(name) == 'string' and name ~= '' then
+			out[name:sub(1, 64)] = math.max(math.floor(tonumber(grade) or 0), 0)
+			any = true
+		end
+	end
+	return any and out or nil
+end
+
+--- List of job types (leo, ems), from the panel
+local function cleanTypes(list)
+	if type(list) ~= 'table' then return nil end
+	local out, seen = {}, {}
+	for _, value in ipairs(list) do
+		if type(value) == 'string' and value ~= '' and not seen[value] then
+			seen[value] = true
+			out[#out + 1] = value:sub(1, 32)
+		end
+	end
+	return #out > 0 and out or nil
+end
+
+local function cleanAccess(access)
+	if type(access) ~= 'table' then return nil end
+	local out = { groups = cleanGrades(access.groups), jobTypes = cleanTypes(access.jobTypes) }
+	return (out.groups or out.jobTypes) and out or nil
+end
+
+local function hasJobType(player, types)
+	if not types then return false end
+	local jobType = GetPlayerJobType(player)
+	return jobType ~= nil and table.contains(types, jobType)
+end
 
 function RemoveItem(playerId, item, slot)
 	local player = GetPlayer(playerId)
@@ -303,8 +347,11 @@ local function isAuthorised(playerId, door, lockpick, state)
 		return true
 	end
 
-	-- Se a porta não tiver NENHUMA permissão definida, ela é pública
-	if not door.characters and not door.groups and not door.items and not door.passcode then
+	-- The door group's rule opens every door in it, on top of the door's own rules.
+	local access = door.doorGroupId and groups[door.doorGroupId]?.access
+
+	-- No rule at all, on the door or its group: a public door.
+	if not door.characters and not door.groups and not door.items and not door.passcode and not door.jobTypes and not access then
 		return true
 	end
 
@@ -325,8 +372,11 @@ local function isAuthorised(playerId, door, lockpick, state)
 			return true
 		end
 
-		if door.groups then
-			authorised = IsPlayerInGroup(player, door.groups) and true or nil
+		if door.groups or door.jobTypes or access then
+			authorised = ((door.groups and IsPlayerInGroup(player, door.groups))
+				or (access?.groups and IsPlayerInGroup(player, access.groups))
+				or hasJobType(player, door.jobTypes)
+				or hasJobType(player, access?.jobTypes)) and true or nil
 		end
 
 		if not authorised and door.items then
@@ -409,6 +459,10 @@ local function installSchema()
 		end
 	end
 
+	if not columnExists('ox_doorlock_groups', 'access') then
+		MySQL.query.await('ALTER TABLE `ox_doorlock_groups` ADD COLUMN `access` longtext DEFAULT NULL')
+	end
+
 	if not columnExists('ox_doorlock', 'group_id') then
 		print('^3[mri_Qdoorlock] Existing ox_doorlock table found, adding the group_id column...^0')
 		MySQL.query.await('ALTER TABLE `ox_doorlock` ADD COLUMN `group_id` int(11) unsigned DEFAULT NULL, ADD KEY `fk_ox_doorlock_group` (`group_id`)')
@@ -461,7 +515,7 @@ MySQL.ready(function()
 	migrateLegacyTables()
 
 	local response = MySQL.query.await('SELECT `id`, `name`, `data`, `group_id` FROM `ox_doorlock`')
-	local groupsResponse = MySQL.query.await('SELECT `id`, `name`, `coords` FROM `ox_doorlock_groups`')
+	local groupsResponse = MySQL.query.await('SELECT `id`, `name`, `coords`, `access` FROM `ox_doorlock_groups`')
 
 	if groupsResponse then
 		for i = 1, #groupsResponse do
@@ -469,6 +523,8 @@ MySQL.ready(function()
 			if type(group.coords) == 'string' then
 				group.coords = json.decode(group.coords)
 			end
+			local ok, access = pcall(json.decode, group.access or '')
+			group.access = ok and cleanAccess(access) or nil
 			groups[group.id] = group
 		end
 	end
@@ -554,53 +610,75 @@ lib.callback.register('ox_doorlock:getDoors', function(source)
 	return safe, sounds, groups
 end)
 
-RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
-	local source = source
+-- Only the saved fields: the client sends its whole door (entity, distance, zone) and that must not spread.
+local function cleanDoor(data)
+	local clean = json.decode(encodeData(data))
+	clean.name = type(data.name) == 'string' and data.name ~= '' and data.name:sub(1, 64) or nil
+	clean.doorGroupId = tonumber(data.doorGroupId)
+	return clean
+end
 
-	if type(id) == 'table' then
-		id = false
-	else
-		id = tonumber(id) or id
+---@return number|false id of the saved door, false when refused
+local function editDoorlock(source, id, data)
+	if not IsPlayerAceAllowed(source, 'command.doorlock') then return false end
+
+	id = type(id) ~= 'table' and (tonumber(id) or id) or false
+
+	if data then
+		data = cleanDoor(data)
+
+		if not data.coords then
+			local double = data.doors
+			if not double or not double[1]?.coords or not double[2]?.coords then return false end
+			local a, b = double[1].coords, double[2].coords
+			data.coords = { x = (a.x + b.x) / 2, y = (a.y + b.y) / 2, z = (a.z + b.z) / 2 }
+		end
+
+		if not data.name then
+			data.name = ('%.2f, %.2f, %.2f'):format(data.coords.x, data.coords.y, data.coords.z)
+		end
 	end
 
-	if IsPlayerAceAllowed(source, 'command.doorlock') then
+	if id then
+		if not doors[id] then return false end
+
 		if data then
-			if not data.coords then
-				local double = data.doors
-				data.coords = double[1].coords - ((double[1].coords - double[2].coords) / 2)
-			end
-
-			if not data.name then
-				data.name = tostring(data.coords)
-			end
-		end
-
-		if id then
-			if data then
-				MySQL.update('UPDATE ox_doorlock SET name = ?, data = ?, group_id = ? WHERE id = ?',
-					{ data.name, encodeData(data), data.doorGroupId, id })
-				data = createDoor(id, data, data.name)
-			else
-				MySQL.update('DELETE FROM ox_doorlock WHERE id = ?', { id })
-				doors[id] = nil
-			end
-
-			broadcastDoorData(
-				function(target) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, data) end,
-				function(target, safe) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, safe) end,
-				data)
+			MySQL.update.await('UPDATE ox_doorlock SET name = ?, data = ?, group_id = ? WHERE id = ?',
+				{ data.name, encodeData(data), data.doorGroupId, id })
+			data = createDoor(id, data, data.name)
 		else
-			local insertId = MySQL.insert.await('INSERT INTO ox_doorlock (name, data, group_id) VALUES (?, ?, ?)',
-				{ data.name, encodeData(data), data.doorGroupId })
-			local door = createDoor(insertId, data, data.name)
-
-			broadcastDoorData(
-				function(target) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, door) end,
-				function(target, safe) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, safe) end,
-				door)
+			MySQL.update.await('DELETE FROM ox_doorlock WHERE id = ?', { id })
+			doors[id] = nil
 		end
+
+		broadcastDoorData(
+			function(target) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, data) end,
+			function(target, safe) TriggerClientEvent('ox_doorlock:editDoorlock', target, id, safe) end,
+			data)
+
+		return id
 	end
+
+	if not data then return false end
+
+	local insertId = MySQL.insert.await('INSERT INTO ox_doorlock (name, data, group_id) VALUES (?, ?, ?)',
+		{ data.name, encodeData(data), data.doorGroupId })
+	local door = createDoor(insertId, data, data.name)
+
+	broadcastDoorData(
+		function(target) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, door) end,
+		function(target, safe) TriggerClientEvent('ox_doorlock:setState', target, door.id, door.state, false, safe) end,
+		door)
+
+	return door.id
+end
+
+RegisterNetEvent('ox_doorlock:editDoorlock', function(id, data)
+	editDoorlock(source, id, data)
 end)
+
+-- The panel waits for the save, so its answer already carries the fresh list.
+lib.callback.register('mri_Qdoorlock:server:editDoor', editDoorlock)
 
 RegisterNetEvent('ox_doorlock:breakLockpick', function()
 	local player = GetPlayer(source)
@@ -650,21 +728,34 @@ lib.addCommand('doorlock', {
 	TriggerClientEvent('ox_doorlock:triggeredCommand', source, args.closest)
 end)
 
-RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
-	local source = source
-	if not IsPlayerAceAllowed(source, 'command.doorlock') then return end
+---@return number|false id of the saved group, false when refused
+local function editGroup(source, id, data)
+	if not IsPlayerAceAllowed(source, 'command.doorlock') then return false end
+
+	id = id and (tonumber(id) or id) or false
+
+	if data then
+		local name = type(data.name) == 'string' and data.name:match('^%s*(.-)%s*$') or ''
+		local coords = (type(data.coords) == 'table' or type(data.coords) == 'vector3') and data.coords or nil
+		if name == '' or not coords then return false end
+		-- Plain table: a vector3 does not survive the NUI answer.
+		-- Without an access field (old callers) the group keeps the rule it had.
+		local access = data.access ~= nil and cleanAccess(data.access) or (id and groups[id]?.access) or nil
+		data = { name = name:sub(1, 64), coords = { x = coords.x + 0.0, y = coords.y + 0.0, z = coords.z + 0.0 }, access = access }
+	end
 
 	if id then
-		id = tonumber(id) or id
+		if not groups[id] then return false end
+
 		if data then
 			data.id = id
-			MySQL.update('UPDATE ox_doorlock_groups SET name = ?, coords = ? WHERE id = ?',
-				{ data.name, json.encode(data.coords), id })
+			MySQL.update.await('UPDATE ox_doorlock_groups SET name = ?, coords = ?, access = ? WHERE id = ?',
+				{ data.name, json.encode(data.coords), data.access and json.encode(data.access) or nil, id })
 			groups[id] = data
 		else
-			MySQL.update('DELETE FROM ox_doorlock_groups WHERE id = ?', { id })
+			MySQL.update.await('DELETE FROM ox_doorlock_groups WHERE id = ?', { id })
 			groups[id] = nil
-			-- Delete all doors in this group
+			-- The foreign key already removed this group's doors from the table.
 			for doorId, door in pairs(doors) do
 				if door.doorGroupId == id then
 					doors[doorId] = nil
@@ -673,12 +764,19 @@ RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
 			end
 		end
 	else
-		local insertId = MySQL.insert.await('INSERT INTO ox_doorlock_groups (name, coords) VALUES (?, ?)',
-			{ data.name, json.encode(data.coords) })
-		id = insertId
-		data.id = insertId
-		groups[insertId] = data
+		if not data then return false end
+		id = MySQL.insert.await('INSERT INTO ox_doorlock_groups (name, coords, access) VALUES (?, ?, ?)',
+			{ data.name, json.encode(data.coords), data.access and json.encode(data.access) or nil })
+		data.id = id
+		groups[id] = data
 	end
 
 	TriggerClientEvent('ox_doorlock:updateGroup', -1, id, data)
+	return id
+end
+
+RegisterNetEvent('ox_doorlock:editGroup', function(id, data)
+	editGroup(source, id, data)
 end)
+
+lib.callback.register('mri_Qdoorlock:server:editGroup', editGroup)

@@ -12,3 +12,8 @@ end
 function IsPlayerInGroup(player, filter)
     return QBX:HasGroup(player.source, filter)
 end
+
+function GetPlayerJobType(player)
+    local qbxPlayer = QBX:GetPlayer(player.source)
+    return qbxPlayer and qbxPlayer.PlayerData.job.type or nil
+end

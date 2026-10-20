@@ -117,290 +117,266 @@ exports('pickClosestDoor', function()
 	pickLock(ClosestDoor.entity)
 end)
 
-local tempData = {}
-
-local function addDoorlock(data)
-	local entity = type(data) == 'number' and data or data.entity
-	local model = GetEntityModel(entity)
-	local coords = GetEntityCoords(entity)
-
-	AddDoorToSystem(`temp`, model, coords.x, coords.y, coords.z, false, false, false)
-	DoorSystemSetDoorState(`temp`, 4, false, false)
-
-	coords = GetEntityCoords(entity)
-	tempData[#tempData + 1] = {
-		entity = entity,
-		model = model,
-		coords = coords,
-		heading = math.floor(GetEntityHeading(entity) + 0.5)
-	}
-
-	RemoveDoorFromSystem(`temp`)
-end
-
-local isAddingDoorlock = false
-
 RegisterNUICallback('notify', function(data, cb)
 	cb(1)
 	lib.notify({ title = data })
 end)
 
-local function handleCreateDoor(data)
-	data.state = (data.state == true or data.state == 1) and 1 or 0
+-- Panel calls answer in their own cb (templates/plugin of the mri-ui-kit skill): inside the mri_Qadmin
+-- iframe SendNUIMessage never arrives, so every answer carries the fresh door and group lists.
+local PLUGIN_ID <const> = 'doorlock'
 
-	if data.items and not next(data.items) then
-		data.items = nil
+--- Vectors as plain tables: the answer of a NUI callback does not keep vector3
+local function plain(v)
+	local t = type(v)
+	if t == 'vector3' or t == 'vector4' then return { x = v.x, y = v.y, z = v.z } end
+	if t ~= 'table' then return v end
+	local out = {}
+	for k, item in pairs(v) do out[k] = plain(item) end
+	return out
+end
+
+-- Client-only fields of a door (game handles, per-frame distance) stay out of the panel and the server.
+local LOCAL_FIELDS <const> = { entity = true, visualOffset = true, distance = true, radius = true }
+
+local function doorForPanel(door)
+	local out = {}
+	for k, v in pairs(door) do
+		if not LOCAL_FIELDS[k] then out[k] = plain(v) end
 	end
-
-	if data.characters and not next(data.characters) then
-		data.characters = nil
+	if out.doors then
+		for i = 1, #out.doors do out.doors[i].entity = nil end
 	end
+	return out
+end
 
-	if data.lockpickDifficulty and not next(data.lockpickDifficulty) then
-		data.lockpickDifficulty = nil
-	end
+DoorForPanel = doorForPanel
 
-	if data.groups and not next(data.groups) then
-		data.groups = nil
-	end
+function DoorsForPanel()
+	local list = {}
+	for _, door in pairs(doors) do list[#list + 1] = doorForPanel(door) end
+	return list
+end
 
-	if not data.id or data.reselect == true then
+function GroupsForPanel()
+	local list = {}
+	for _, group in pairs(doorGroups) do list[#list + 1] = plain(group) end
+	return list
+end
+
+local function fromAdmin(data)
+	return type(data) == 'table' and data.embedded == true and GetResourceState('mri_Qadmin') == 'started'
+end
+
+--- Register a panel call: fn answers a table or value; the fresh lists ride along in _events
+local function panelCallback(name, fn)
+	RegisterNUICallback(name, function(data, cb)
+		local ok, result = pcall(fn, type(data) == 'table' and data or {})
+		if not ok then lib.print.error(result) end
+		local answer = type(result) == 'table' and result or { value = ok and result or false }
+		answer._events = {
+			{ action = 'updateDoorData', data = DoorsForPanel() },
+			{ action = 'updateDoorGroups', data = GroupsForPanel() },
+		}
+		cb(plain(answer))
+	end)
+end
+
+local function hidePanel(data)
+	if fromAdmin(data) then
+		pcall(function() exports.mri_Qadmin:ClosePlugin() end)
+	else
 		SetNuiFocus(false, false)
 		ClearTimecycleModifier()
-		isAddingDoorlock = true
-		local doorCount = data.doors and 2 or 1
-		local lastEntity = 0
+		SendNUIMessage({ action = 'setVisible', data = false })
+	end
+end
 
-		lib.showTextUI(locale('add_door_textui'))
+local function showPanel(data)
+	if fromAdmin(data) then
+		pcall(function() exports.mri_Qadmin:OpenPlugin(PLUGIN_ID) end)
+	else
+		SetNuiFocus(true, true)
+		SetTimecycleModifier('hud_def_blur')
+		SendNUIMessage({ action = 'setVisible', data = true })
+	end
+end
 
-		-- Helper: raycast first, fall back to object proximity scan for doors
-		-- with no raycast-detectable collision (e.g. DoorSystem-managed grates)
-		local function getTargetEntity()
-			local hit, ent, coord = lib.raycast.fromCamera(1|16)
-			local entType = hit and ent and GetEntityType(ent) or 0
-			-- If raycast found a valid prop entity, return it directly
-			if hit and ent > 0 and entType == 3 then
-				return hit, ent, coord
-			end
-			-- Fallback: scan nearby objects along the camera ray
-			-- This handles doors managed by GTA's native DoorSystem (no raycast collision)
-			local camPos = GetGameplayCamCoord()
-			local camRot = GetGameplayCamRot(2)
-			local radX = math.rad(camRot.x)
-			local radZ = math.rad(camRot.z)
-			local camDir = vector3(
-				-math.sin(radZ) * math.cos(radX),
-				math.cos(radZ) * math.cos(radX),
-				math.sin(radX)
-			)
-			local bestHandle = 0
-			local bestProj = math.huge
-			local handle, object = FindFirstObject()
-			local found = true
-			while found do
-				if DoesEntityExist(object) and GetEntityType(object) == 3 then
-					local objPos = GetEntityCoords(object)
-					local toObj = objPos - camPos
-					local proj = toObj.x * camDir.x + toObj.y * camDir.y + toObj.z * camDir.z
-					if proj > 0.3 and proj < 8.0 then
-						local cx = toObj.y * camDir.z - toObj.z * camDir.y
-						local cy = toObj.z * camDir.x - toObj.x * camDir.z
-						local cz = toObj.x * camDir.y - toObj.y * camDir.x
-						local rayDist = math.sqrt(cx*cx + cy*cy + cz*cz)
-						if rayDist < 1.2 and proj < bestProj then
-							bestProj = proj
-							bestHandle = object
-						end
-					end
-				end
-				found, object = FindNextObject(handle)
-			end
-			EndFindObject(handle)
-			if bestHandle ~= 0 then
-				return true, bestHandle, GetEntityCoords(bestHandle)
-			end
-			return hit, ent, coord
-		end
+--- World tool: hide the panel, run the tool on its own thread (a loop inside the NUI callback misses keys), come back
+local function inWorld(data, fn)
+	hidePanel(data)
+	local done = promise.new()
+	CreateThread(function()
+		local ok, result = pcall(fn)
+		if not ok then lib.print.error(result) end
+		done:resolve(ok and result or false)
+	end)
+	local result = Citizen.Await(done)
+	showPanel(data)
+	return result
+end
 
-		repeat
-			DisablePlayerFiring(cache.playerId, true)
-			DisableControlAction(0, 25, true)
+local function emptyToNil(data, key)
+	if type(data[key]) == 'table' and not next(data[key]) then data[key] = nil end
+end
 
-			local hit, entity, coords = getTargetEntity()
-			local changedEntity = lastEntity ~= entity
-			local doorA = tempData[1]?.entity
+local function normalizeDoor(data)
+	data.state = (data.state == true or data.state == 1) and 1 or 0
+	emptyToNil(data, 'items')
+	emptyToNil(data, 'characters')
+	emptyToNil(data, 'lockpickDifficulty')
+	emptyToNil(data, 'groups')
+	emptyToNil(data, 'jobTypes')
+	for key in pairs(LOCAL_FIELDS) do data[key] = nil end
+end
 
-			if changedEntity and lastEntity ~= doorA then
-				if not outlinedEntities[lastEntity] then
-					SetEntityDrawOutline(lastEntity, false)
-				end
-			end
+local function acceptEntity(doorId)
+	return function(entity) return entityIsNotDoor(entity, doorId) end
+end
 
-			lastEntity = entity
+--- Saves a door; a new door, or one being picked again, first gets its entities picked in the world
+---@return number|false
+local function saveDoor(data)
+	normalizeDoor(data)
 
-			if hit then
-				---@diagnostic disable-next-line: param-type-mismatch
-				DrawMarker(28, coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.2, 0.2, 255, 42, 24,
-					100, false, false, 0, true, false, false, false)
-			end
-
-			if hit and entity > 0 and GetEntityType(entity) ~= 0 and GetEntityType(entity) ~= 1 and GetEntityType(entity) ~= 2 and (doorCount == 1 or doorA ~= entity) and entityIsNotDoor(entity, data.id) then
-				if changedEntity then
-					SetEntityDrawOutline(entity, true)
-				end
-
-				if IsDisabledControlJustPressed(0, 24) then
-					addDoorlock(entity)
-				end
-			end
-
-			if IsDisabledControlJustPressed(0, 25) then
-				if not outlinedEntities[entity] then
-					SetEntityDrawOutline(entity, false)
-				end
-
-				if not doorA then
-					isAddingDoorlock = false
-					return lib.hideTextUI()
-				end
-
-				if not outlinedEntities[doorA] then
-					SetEntityDrawOutline(doorA, false)
-				end
-				table.wipe(tempData)
-			end
-		until tempData[doorCount]
-
-		lib.hideTextUI()
-		if not outlinedEntities[tempData[1].entity] then
-			SetEntityDrawOutline(tempData[1].entity, false)
-		end
+	if not data.id or data.reselect == true then
+		local picked = DoorPicker.pick(data.doors and 2 or 1, acceptEntity(data.id))
+		if not picked then return false end
 
 		if data.doors then
-			if not outlinedEntities[tempData[2].entity] then
-				SetEntityDrawOutline(tempData[2].entity, false)
-			end
-			tempData[1].entity = nil
-			tempData[2].entity = nil
-			data.doors = tempData
+			data.doors = picked
 			data.coords = nil
+			data.model, data.heading = nil, nil
 		else
-			data.model = tempData[1].model
-			data.coords = tempData[1].coords
-			data.heading = tempData[1].heading
+			data.model = picked[1].model
+			data.coords = picked[1].coords
+			data.heading = picked[1].heading
 		end
 	else
 		local oldDoor = doors[data.id]
 
-		if data.doors and type(data.doors) == 'table' then
+		if type(data.doors) == 'table' then
 			for i = 1, 2 do
-				if data.doors[i] then
-					local coords = data.doors[i].coords
-					if coords and type(coords) == 'table' and coords.x then
-						data.doors[i].coords = vector3(coords.x, coords.y, coords.z)
-					elseif not coords and oldDoor and oldDoor.doors and oldDoor.doors[i] then
-						data.doors[i].coords = oldDoor.doors[i].coords
-					end
-					data.doors[i].entity = nil
+				if data.doors[i] and not data.doors[i].coords and oldDoor?.doors?[i] then
+					data.doors[i].coords = oldDoor.doors[i].coords
 				end
 			end
 		else
 			data.doors = nil
-			data.entity = nil
 		end
 
-		if data.coords and type(data.coords) == 'table' and data.coords.x then
-			data.coords = vector3(data.coords.x, data.coords.y, data.coords.z)
-		elseif not data.coords and oldDoor then
-			data.coords = oldDoor.coords
-		end
-		data.distance = nil
-		data.zone = nil
+		if not data.coords and oldDoor then data.coords = oldDoor.coords end
 	end
 
-	isAddingDoorlock = false
+	data.reselect = nil
+	data.zone = nil
 
-	if data.reselect and data.id then
-		-- Delete the old door entirely
-		TriggerServerEvent('ox_doorlock:editDoorlock', data.id)
-		-- Strip the ID so the server creates a brand new door
-		data.id = nil
+	-- Unnamed doors get the area name, not the coordinates the server would use.
+	local at = data.coords or data.doors?[1]?.coords
+	if (type(data.name) ~= 'string' or data.name == '') and at then
+		data.name = locale('new_door_name', GetLabelText(GetNameOfZone(at.x, at.y, at.z)))
 	end
 
-	TriggerServerEvent('ox_doorlock:editDoorlock', data.id or false, data)
-	table.wipe(tempData)
+	-- Picking again keeps the same id: scripts and aces that point at it keep working.
+	return lib.callback.await('mri_Qdoorlock:server:editDoor', false, data.id or false, plain(data))
 end
 
-RegisterNUICallback('createDoor', function(data, cb)
-	cb(1)
-	handleCreateDoor(data)
+local function needsWorld(door)
+	return not door.id or door.reselect == true
+end
+
+panelCallback('createDoor', function(data)
+	local door = type(data.door) == 'table' and data.door or data
+	if needsWorld(door) then
+		return { id = inWorld(data, function() return saveDoor(door) end) }
+	end
+	return { id = saveDoor(door) }
 end)
 
-RegisterNUICallback('deleteDoor', function(id, cb)
-	cb(1)
-	TriggerServerEvent('ox_doorlock:editDoorlock', id)
+local function doorIdOf(data)
+	return tonumber(data.id or data.value) or data.id or data.value
+end
+
+panelCallback('deleteDoor', function(data)
+	return lib.callback.await('mri_Qdoorlock:server:editDoor', false, doorIdOf(data), nil) ~= false
 end)
 
-RegisterNUICallback('deleteDoorsBulk', function(doorIds, cb)
-	cb(1)
-	if type(doorIds) ~= 'table' then return end
-	
-	Citizen.CreateThread(function()
-		for _, doorId in ipairs(doorIds) do
-			local id = tonumber(doorId) or doorId
-			TriggerServerEvent('ox_doorlock:editDoorlock', id)
-			Wait(150)
+panelCallback('deleteDoorsBulk', function(data)
+	for _, doorId in ipairs(type(data.doorIds) == 'table' and data.doorIds or {}) do
+		lib.callback.await('mri_Qdoorlock:server:editDoor', false, tonumber(doorId) or doorId, nil)
+	end
+	return true
+end)
+
+local BULK_KEYS <const> = {
+	'state', 'passcode', 'passcodeType', 'passcodeCoords', 'autolock', 'maxDistance', 'doorRate',
+	'auto', 'lockpick', 'lockpickSystem', 'hideUi', 'holdOpen', 'items', 'characters',
+	'groups', 'jobTypes', 'lockpickDifficulty', 'lockSound', 'unlockSound',
+}
+
+panelCallback('editDoorsBulk', function(data)
+	if type(data.doorIds) ~= 'table' or type(data.changes) ~= 'table' then return false end
+
+	for _, doorId in ipairs(data.doorIds) do
+		local door = doors[tonumber(doorId) or doorId]
+		if door then
+			local fullData = {}
+			for k, v in pairs(door) do fullData[k] = v end
+			for _, key in ipairs(BULK_KEYS) do fullData[key] = data.changes[key] end
+			normalizeDoor(fullData)
+			lib.callback.await('mri_Qdoorlock:server:editDoor', false, door.id, plain(fullData))
 		end
-	end)
+	end
+	return true
 end)
 
-RegisterNUICallback('editDoorsBulk', function(data, cb)
-	cb(1)
-	if type(data.doorIds) ~= 'table' or type(data.changes) ~= 'table' then return end
-	
-	Citizen.CreateThread(function()
-		for _, doorId in ipairs(data.doorIds) do
-			local id = tonumber(doorId) or doorId
-			local door = doors[id]
-			if door then
-				local fullData = {}
-				for k, v in pairs(door) do fullData[k] = v end
-				local updatableKeys = {
-					'state', 'passcode', 'passcodeType', 'passcodeCoords', 'autolock', 'maxDistance', 'doorRate', 
-					'auto', 'lockpick', 'lockpickSystem', 'hideUi', 'holdOpen', 'items', 'characters', 
-					'groups', 'lockpickDifficulty', 'lockSound', 'unlockSound'
-				}
-				
-				for _, key in ipairs(updatableKeys) do
-					fullData[key] = data.changes[key]
-				end
-				
-				fullData.state = (fullData.state == true or fullData.state == 1) and 1 or 0
-				
-				if fullData.items and not next(fullData.items) then fullData.items = nil end
-				if fullData.characters and not next(fullData.characters) then fullData.characters = nil end
-				if fullData.lockpickDifficulty and not next(fullData.lockpickDifficulty) then fullData.lockpickDifficulty = nil end
-				if fullData.groups and not next(fullData.groups) then fullData.groups = nil end
-				
-				TriggerServerEvent('ox_doorlock:editDoorlock', doorId, fullData)
-				Wait(150)
-			end
-		end
-	end)
+local function moveDoor(doorId, groupId)
+	local door = doors[tonumber(doorId) or doorId]
+	if not door then return false end
+	local newDoorData = {}
+	for k, v in pairs(door) do newDoorData[k] = v end
+	newDoorData.doorGroupId = groupId
+	normalizeDoor(newDoorData)
+	return lib.callback.await('mri_Qdoorlock:server:editDoor', false, door.id, plain(newDoorData)) ~= false
+end
+
+panelCallback('moveDoorToGroup', function(data)
+	return moveDoor(data.doorId, tonumber(data.groupId))
 end)
 
-RegisterNUICallback('teleportToDoor', function(id, cb)
-	cb(1)
-	SetNuiFocus(false, false)
-	ClearTimecycleModifier()
-	TriggerServerEvent('ox_doorlock:teleportToDoor', id)
+panelCallback('moveDoorsToGroup', function(data)
+	for _, doorId in ipairs(type(data.doorIds) == 'table' and data.doorIds or {}) do
+		moveDoor(doorId, tonumber(data.groupId))
+	end
+	return true
 end)
 
-RegisterNUICallback('teleportToGroup', function(id, cb)
-	cb(1)
-	SetNuiFocus(false, false)
-	ClearTimecycleModifier()
-	TriggerServerEvent('ox_doorlock:teleportToGroup', id)
+panelCallback('createGroup', function(data)
+	if type(data.name) ~= 'string' then return false end
+	return { id = lib.callback.await('mri_Qdoorlock:server:editGroup', false, false, { name = data.name, coords = plain(GetEntityCoords(cache.ped)) }) }
+end)
+
+panelCallback('editGroup', function(data)
+	local id = tonumber(data.id)
+	if not id or type(data.name) ~= 'string' then return false end
+	local coords = data.updateCoords and GetEntityCoords(cache.ped) or doorGroups[id]?.coords
+	return lib.callback.await('mri_Qdoorlock:server:editGroup', false, id, { name = data.name, coords = plain(coords), access = data.access }) ~= false
+end)
+
+panelCallback('deleteGroup', function(data)
+	return lib.callback.await('mri_Qdoorlock:server:editGroup', false, doorIdOf(data), nil) ~= false
+end)
+
+panelCallback('teleportToDoor', function(data)
+	hidePanel(data)
+	TriggerServerEvent('ox_doorlock:teleportToDoor', doorIdOf(data))
+	return true
+end)
+
+panelCallback('teleportToGroup', function(data)
+	hidePanel(data)
+	TriggerServerEvent('ox_doorlock:teleportToGroup', doorIdOf(data))
+	return true
 end)
 
 local function ClearOutlines()
@@ -514,7 +490,7 @@ Citizen.CreateThread(function()
 					if dist < 100.0 then
 						local text = ("[%s] %s"):format(door.id, door.name)
 						
-						if door.id == targetedDoorId and not isAddingDoorlock then
+						if door.id == targetedDoorId and not DoorPicker.isActive() then
 							text = text .. "\n~g~[ENTER]~w~ " .. locale('debug_edit') .. " | ~b~[G]~w~ " .. locale('debug_duplicate') .. " | ~r~[BACKSPACE]~w~ " .. locale('debug_delete')
 							if not IsNuiFocused() then
 								if IsControlJustPressed(0, 191) then
@@ -533,7 +509,7 @@ Citizen.CreateThread(function()
 									cloneData.reselect = true
 									
 									CreateThread(function()
-										handleCreateDoor(cloneData)
+										saveDoor(cloneData)
 									end)
 								elseif IsControlJustPressed(0, 194) then
 									SetNuiFocus(true, true)
@@ -660,20 +636,20 @@ end)
 
 
 function openUi(id)
-	if source == '' or isAddingDoorlock then return end
+	if source == '' or DoorPicker.isActive() then return end
 
 	if not NuiHasLoaded then
 		NuiHasLoaded = true
 
 		SendNuiMessage(json.encode({
 			action = 'updateDoorData',
-			data = doors
+			data = DoorsForPanel()
 		}, { with_hole = false }))
 		Wait(100)
 
 		SendNuiMessage(json.encode({
 			action = 'updateDoorGroups',
-			data = doorGroups
+			data = GroupsForPanel()
 		}, { with_hole = false }))
 		Wait(100)
 
@@ -720,28 +696,13 @@ RegisterNUICallback('requestData', function(_, cb)
 	local hasT3Lockpick = GetResourceState('t3_lockpick') == 'started' or GetResourceState('t3_lockpick') == 'starting'
 
 	cb({
-		doors = doors,
-		doorGroups = doorGroups,
+		doors = DoorsForPanel(),
+		doorGroups = GroupsForPanel(),
 		sounds = soundFiles,
 		debugGroupId = debugGroupId,
 		locale = localeStr,
 		locales = translations,
 		hasT3Lockpick = hasT3Lockpick
-	})
-
-	SendNuiMessage(json.encode({
-		action = 'updateDoorData',
-		data = doors
-	}, { with_hole = false }))
-	Wait(10)
-	SendNuiMessage(json.encode({
-		action = 'updateDoorGroups',
-		data = doorGroups
-	}, { with_hole = false }))
-	Wait(10)
-	SendNUIMessage({
-		action = 'setSoundFiles',
-		data = soundFiles
 	})
 end)
 
@@ -831,6 +792,10 @@ end)
 
 RegisterNUICallback('getGroupOptions', function(_, cb)
 	cb(lib.callback.await('mri_Qdoorlock:server:groupOptions', false) or {})
+end)
+
+RegisterNUICallback('getJobTypeOptions', function(_, cb)
+	cb(lib.callback.await('mri_Qdoorlock:server:jobTypeOptions', false) or {})
 end)
 
 RegisterNUICallback('getCharacterOptions', function(_, cb)
