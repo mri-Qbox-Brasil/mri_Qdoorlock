@@ -1,4 +1,4 @@
--- Door picking in the world (mri-world-placement rules): aim on its own thread, rail on the NUI, E / Backspace / Esc.
+-- Door picking in the world (mri-world-placement rules): aim and keys in one frame loop, rail on the NUI, E / Backspace / Esc.
 
 DoorPicker = {}
 
@@ -6,9 +6,17 @@ local KEY <const> = { mark = 38, undo = 177, cancel = 200 }
 -- Weapon wheel, attacks, vehicle weapon scroll and Esc, so the keys only drive the tool.
 local BLOCKED <const> = { 14, 15, 16, 17, 24, 25, 37, 44, 140, 141, 142, 200 }
 local RAY_DISTANCE <const> = 10.0
-local SCAN_EVERY <const> = 150
 
 local active = false
+
+-- Outline color and shader are global to the game: another script (mri_Qspawn fades the alpha to 0) can leave them invisible.
+function OutlineDoor(entity, on)
+	if on then
+		SetEntityDrawOutlineShader(0)
+		SetEntityDrawOutlineColor(255, 255, 255, 255)
+	end
+	SetEntityDrawOutline(entity, on)
+end
 
 -- escBusy tells the MRI pause menu (it reads Esc even while blocked) that Esc belongs to the tool.
 local function hud(data)
@@ -39,32 +47,26 @@ local function scanAlongCamera()
 	local best, bestProj = nil, math.huge
 
 	for _, object in ipairs(GetGamePool('CObject')) do
-		local offset = GetEntityCoords(object) - camPos
-		local proj = offset.x * dir.x + offset.y * dir.y + offset.z * dir.z
-		if proj > 0.3 and proj < 8.0 and proj < bestProj and #(offset - dir * proj) < 1.2 then
-			best, bestProj = object, proj
+		-- Weapons and props held by the player sit on the camera ray too.
+		if not IsEntityAttached(object) then
+			local offset = GetEntityCoords(object) - camPos
+			local proj = offset.x * dir.x + offset.y * dir.y + offset.z * dir.z
+			if proj > 0.3 and proj < 8.0 and proj < bestProj and #(offset - dir * proj) < 1.2 then
+				best, bestProj = object, proj
+			end
 		end
 	end
 
 	return best
 end
 
--- The ox_lib raycast waits a frame, so it runs apart and the draw loop keeps every frame.
-local function trackAim(aim)
-	CreateThread(function()
-		local scanned = 0
-		while active do
-			local hit, entity, coords = lib.raycast.fromCamera(1 | 16, 4, RAY_DISTANCE)
-			if hit and entity > 0 and GetEntityType(entity) == 3 then
-				aim.entity, aim.coords = entity, coords
-			elseif GetGameTimer() - scanned > SCAN_EVERY then
-				scanned = GetGameTimer()
-				local object = scanAlongCamera()
-				aim.entity = object
-				aim.coords = object and GetEntityCoords(object) or (hit and coords or nil)
-			end
-		end
-	end)
+-- Same target as the upstream tool: the prop the ray hits, else the scan. The raycast waits the frame.
+local function aimTarget()
+	local hit, entity, coords = lib.raycast.fromCamera(1 | 16, 4, RAY_DISTANCE)
+	if hit and entity > 0 and GetEntityType(entity) == 3 then return entity, coords end
+	local object = scanAlongCamera()
+	if object then return object, GetEntityCoords(object) end
+	return nil, hit and coords or nil
 end
 
 -- Model, closed position and heading of the door entity.
@@ -95,7 +97,7 @@ function DoorPicker.pick(count, accept)
 	if active then return nil end
 	active = true
 
-	local aim, picked = {}, {}
+	local picked = {}
 	local r, g, b = accent()
 	local outlined
 	local result
@@ -110,21 +112,20 @@ function DoorPicker.pick(count, accept)
 	local function push() hud({ mode = 'door', count = #picked, total = count }) end
 
 	push()
-	trackAim(aim)
 
+	-- One frame per turn: aimTarget waits it, so the loop has no Wait of its own (a second one skips keys and draws).
 	while active do
+		local entity, point = aimTarget()
 		for i = 1, #BLOCKED do DisableControlAction(0, BLOCKED[i], true) end
 
-		local entity = aim.entity
 		local valid = entity and DoesEntityExist(entity) and not isPicked(entity) and accept(entity) and entity or nil
 
 		if outlined ~= valid then
 			if outlined and not isPicked(outlined) then SetEntityDrawOutline(outlined, false) end
 			outlined = valid
-			if outlined then SetEntityDrawOutline(outlined, true) end
+			if outlined then OutlineDoor(outlined, true) end
 		end
 
-		local point = aim.coords
 		if point then
 			DrawMarker(28, point.x, point.y, point.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.1, 0.1, r, g, b, 220, false, false, 2, false, nil, nil, false)
 		end
@@ -149,8 +150,6 @@ function DoorPicker.pick(count, accept)
 			releaseEsc()
 			break
 		end
-
-		Wait(0)
 	end
 
 	active = false

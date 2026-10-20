@@ -455,7 +455,7 @@ Citizen.CreateThread(function()
 									currentEntities[ent] = true
 									if ent == rayEntity then isAimingAtDoor = true end
 									if not outlinedEntities[ent] then
-										SetEntityDrawOutline(ent, true)
+										OutlineDoor(ent, true)
 										outlinedEntities[ent] = true
 									end
 								end
@@ -467,7 +467,7 @@ Citizen.CreateThread(function()
 							currentEntities[ent] = true
 							if ent == rayEntity then isAimingAtDoor = true end
 							if not outlinedEntities[ent] then
-								SetEntityDrawOutline(ent, true)
+								OutlineDoor(ent, true)
 								outlinedEntities[ent] = true
 							end
 						end
